@@ -134,6 +134,15 @@ export interface WebToolsContext {
   get(name: string): unknown;
   /** Human-command registry (`ctx.commands`) for /search slash entries. */
   commands: WebToolsCommands;
+  /**
+   * Optional `systemPrompt` registry. Deliberately NOT in `inject`: a host
+   * without the service must still mount this plugin, so the guidance section
+   * is registered through `ctx.inject(["systemPrompt"], ...)` instead.
+   */
+  systemPrompt?: {
+    section(section: { name: string; order: number; text: string }): unknown;
+    getSectionOrder?(name: string): number;
+  };
 }
 
 // ---------------------------------------------------------------------------

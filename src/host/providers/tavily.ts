@@ -17,6 +17,7 @@ import { providerError, classifyHttpStatus, resolveContext, parseRetryAfter, typ
 import { fetchWithProxy } from "../fetch-proxy.ts";
 import type { TavilyProviderOptions } from "../../shared/provider-options.ts";
 import type { SearchHints } from "../search-hints.ts";
+import { countryName, resolveCountryCode } from "../countries.ts";
 
 const TAVILY_SEARCH_URL = "https://api.tavily.com/search";
 const TAVILY_EXTRACT_URL = "https://api.tavily.com/extract";
@@ -29,67 +30,19 @@ const TAVILY_EXTRACT_URL = "https://api.tavily.com/extract";
  *    from the selected country in the search results. Available only if topic is
  *    `general`." — https://docs.tavily.com/documentation/api-reference/endpoint/search
  *
- * Our shared `LocaleHint.country` is alpha-2 (what Brave, Exa, Firecrawl and
- * You.com expect), so the two vocabularies have to be bridged here. Forwarding
- * the raw code made every query that merely mentioned a country fail outright:
+ * Our canonical form is alpha-2 (what Brave, Exa, Firecrawl and You.com expect),
+ * so the vocabularies are bridged in `../countries.ts`. Forwarding the raw code
+ * made every query that merely mentioned a country fail outright:
  *
  *   bad-request: Tavily: Invalid country. Must be a valid country name from the
  *   list of supported countries
  *
- * — a hard 400 before retrieval ever ran. Anything absent from this table is
+ * — a hard 400 before retrieval ever ran. Anything Tavily does not enumerate is
  * dropped rather than forwarded: losing a ranking nudge is much cheaper than
  * losing the whole search.
  */
-const TAVILY_COUNTRY_BY_ISO2: Readonly<Record<string, string>> = (() => {
-  const packed =
-    "AF:afghanistan,AL:albania,DZ:algeria,AD:andorra,AO:angola,AR:argentina,AM:armenia," +
-    "AU:australia,AT:austria,AZ:azerbaijan,BS:bahamas,BH:bahrain,BD:bangladesh,BB:barbados," +
-    "BY:belarus,BE:belgium,BZ:belize,BJ:benin,BT:bhutan,BO:bolivia,BA:bosnia and herzegovina," +
-    "BW:botswana,BR:brazil,BN:brunei,BG:bulgaria,BF:burkina faso,BI:burundi,KH:cambodia," +
-    "CM:cameroon,CA:canada,CV:cape verde,CF:central african republic,TD:chad,CL:chile," +
-    "CN:china,CO:colombia,KM:comoros,CG:congo,CR:costa rica,HR:croatia,CU:cuba,CY:cyprus," +
-    "CZ:czech republic,DK:denmark,DJ:djibouti,DO:dominican republic,EC:ecuador,EG:egypt," +
-    "SV:el salvador,GQ:equatorial guinea,ER:eritrea,EE:estonia,ET:ethiopia,FJ:fiji,FI:finland," +
-    "FR:france,GA:gabon,GM:gambia,GE:georgia,DE:germany,GH:ghana,GR:greece,GT:guatemala," +
-    "GN:guinea,HT:haiti,HN:honduras,HU:hungary,IS:iceland,IN:india,ID:indonesia,IR:iran," +
-    "IQ:iraq,IE:ireland,IL:israel,IT:italy,JM:jamaica,JP:japan,JO:jordan,KZ:kazakhstan," +
-    "KE:kenya,KW:kuwait,KG:kyrgyzstan,LV:latvia,LB:lebanon,LS:lesotho,LR:liberia,LY:libya," +
-    "LI:liechtenstein,LT:lithuania,LU:luxembourg,MG:madagascar,MW:malawi,MY:malaysia," +
-    "MV:maldives,ML:mali,MT:malta,MR:mauritania,MU:mauritius,MX:mexico,MD:moldova,MC:monaco," +
-    "MN:mongolia,ME:montenegro,MA:morocco,MZ:mozambique,MM:myanmar,NA:namibia,NP:nepal," +
-    "NL:netherlands,NZ:new zealand,NI:nicaragua,NE:niger,NG:nigeria,KP:north korea," +
-    "MK:north macedonia,NO:norway,OM:oman,PK:pakistan,PA:panama,PG:papua new guinea," +
-    "PY:paraguay,PE:peru,PH:philippines,PL:poland,PT:portugal,QA:qatar,RO:romania,RU:russia," +
-    "RW:rwanda,SA:saudi arabia,SN:senegal,RS:serbia,SG:singapore,SK:slovakia,SI:slovenia," +
-    "SO:somalia,ZA:south africa,KR:south korea,SS:south sudan,ES:spain,LK:sri lanka,SD:sudan," +
-    "SE:sweden,CH:switzerland,SY:syria,TJ:tajikistan,TZ:tanzania,TH:thailand,TG:togo," +
-    "TT:trinidad and tobago,TN:tunisia,TR:turkey,TM:turkmenistan,UG:uganda,UA:ukraine," +
-    "AE:united arab emirates,GB:united kingdom,US:united states,UY:uruguay,UZ:uzbekistan," +
-    "VE:venezuela,VN:vietnam,YE:yemen,ZM:zambia,ZW:zimbabwe";
-  const table: Record<string, string> = {};
-  for (const entry of packed.split(",")) {
-    const sep = entry.indexOf(":");
-    table[entry.slice(0, sep)] = entry.slice(sep + 1);
-  }
-  return table;
-})();
-
-/** Every value Tavily accepts, for pass-through validation of already-normalised names. */
-const TAVILY_COUNTRY_NAMES: ReadonlySet<string> = new Set(Object.values(TAVILY_COUNTRY_BY_ISO2));
-
-/**
- * Translate a locale country into Tavily's vocabulary.
- *
- * Accepts an alpha-2 code ("FR") or an already-normalised Tavily name
- * ("france"). Returns `undefined` when Tavily has no equivalent, so the caller
- * omits the parameter instead of sending a value the API rejects with a 400.
- */
 export function resolveTavilyCountry(country: string | undefined): string | undefined {
-  const value = (country ?? "").trim().toLowerCase();
-  if (!value) return undefined;
-  const byCode = TAVILY_COUNTRY_BY_ISO2[value.toUpperCase()];
-  if (byCode) return byCode;
-  return TAVILY_COUNTRY_NAMES.has(value) ? value : undefined;
+  return countryName(resolveCountryCode(country));
 }
 
 /**
@@ -101,7 +54,7 @@ export function resolveTavilyCountry(country: string | undefined): string | unde
  *  - time_range: "day" | "week" | "month" | "year"
  *  - start_date: RFC3339 / YYYY-MM-DD from hints
  *  - include_domains / exclude_domains
- *  - country: translated from the alpha-2 hint (see TAVILY_COUNTRY_BY_ISO2)
+ *  - country: translated from the alpha-2 hint (see resolveTavilyCountry)
  */
 export function buildTavilySearchBody(
   query: string,

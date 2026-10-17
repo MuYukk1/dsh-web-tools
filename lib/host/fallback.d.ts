@@ -6,8 +6,12 @@
  *   unavailable, caller timeout, AND auth failures (401/403): a bad key on
  *   one provider should not block the user's search — the key is marked
  *   unhealthy and the UI shows an auth error, but the search continues.
- * Non-retryable (never fall back): 400 invalid query, schema/config bugs,
- * programming errors — silently switching would hide broken configuration.
+ *   A provider-side 400 also falls through: it is that provider rejecting a
+ *   parameter (Tavily once rejected every `country` code), and the next source
+ *   may serve the same query fine. The failure stays in `attempts`, so nothing
+ *   is hidden — but the user still gets results.
+ * Non-retryable (never fall back): schema/config bugs — silently switching
+ * would hide a broken configuration that no provider can serve.
  * Terminal: caller cancellation (aborted) — the whole chain must stop
  * immediately, never continue to the next provider.
  * @module

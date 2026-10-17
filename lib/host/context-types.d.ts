@@ -39,10 +39,13 @@ export interface WebToolsWebServer {
     readonly port?: number;
     readonly host?: string;
 }
-/** The web runtime face (trusted hosts list for the browser fence). */
-export interface WebToolsWebRuntime {
-    trustedHosts: readonly string[];
-}
+/**
+ * DSH 0.2.1 removed the `webRuntime` service (the Web profile now provides
+ * `webStartup` instead) — see `docs/upgrade-guide/v0.2.1-alpha.1/web-listener-trust-config`.
+ * This plugin never read it: the `/web-tools/api` fence is loopback-only and
+ * deliberately does NOT treat `trustedHosts` as authentication, so no
+ * structural mirror is needed any more.
+ */
 /** The settings service face (mirror of dsh-settings SettingsProvider). */
 export interface WebToolsSettingsService {
     register<T>(ns: string, schema: unknown, options?: {
@@ -128,7 +131,6 @@ export interface WebToolsEffect {
  */
 export interface WebToolsContext {
     webServer: WebToolsWebServer;
-    webRuntime: WebToolsWebRuntime;
     settings: WebToolsSettingsService;
     credentials: WebToolsCredentialsService;
     web: WebToolsWebSeam;

@@ -157,6 +157,19 @@ dsh plugin --profile web remove dsh-web-tools
 
 重启 `dsh web`，在左侧侧边栏进入：`Settings` → `Web Search`。
 
+### DSH 宿主兼容性
+
+| DSH 宿主版本 | 状态 |
+| --- | --- |
+| `0.2.1-rc.2` | 支持（当前发布版本） |
+| `0.2.0-rc.1` – `0.2.0` | 支持 |
+| `0.1.0-rc.6` – `0.1.7` | 支持 |
+
+兼容范围写在 `engines.dsh` 中。DSH 0.2.1 起**优先按该字段判定**，不再看 `@deepseek-ai/dsh*` 的 peer 范围，因此这里两者保持同步。0.2.1 系列有两处变更与插件直接相关：
+
+- **`webRuntime` 服务已被移除。** DSH 0.2.1 用 `webStartup` 取代它（监听地址与信任配置随之迁移）。本插件已不再注入该服务——插件若仍声明一个永远不会挂载的服务，会一直停在 pending 状态，导致所有供应商、设置接口与页面静默失效。
+- **DSH 自带了网页搜索设置页。** `插件` → `网页搜索设置`（区块 id `web-search`）用于配置 DeepSeek 官方的 Search / Fetch API，写入的正是本插件固定为 `dsh-web-tools` 的同一份 `web` 配置。在该页切换为 DeepSeek 供应商（或导出 `DSH_WEB_SEARCH_PROVIDER`）会绕过本插件，需要重新固定为 `dsh-web-tools` 才能恢复。本插件自己的页面仍在 `Settings` → `Web Search`（id `web-tools`）。
+
 ---
 
 ## Provider 支持矩阵

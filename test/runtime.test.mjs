@@ -113,6 +113,28 @@ test("attempt timeout aborts the in-flight provider call, then falls back", asyn
   assert.equal(exa.calls.length, 1, "exa attempted after timeout");
 });
 
+test("provider-side 400 falls through to the next provider instead of aborting", async () => {
+  // A provider rejecting a parameter (Tavily once rejected every ISO country
+  // code) says nothing about whether the next source can serve the query.
+  const badRequest = Object.assign(new Error("Tavily: Invalid country"), { code: "bad-request" });
+  const tavily = stubAdapter("tavily", { failWith: badRequest });
+  const exa = stubAdapter("exa");
+  const provider = createSearchProvider(
+    () => cfg(),
+    async () => "k1",
+    { record() {} },
+    { tavily, exa },
+  );
+  const result = await provider.search({ query: "q" });
+  assert.equal(result.sources[0].url, "https://exa.example", "fell back after a provider 400");
+  assert.equal(tavily.calls.length, 1, "tavily attempted once");
+  assert.equal(exa.calls.length, 1, "exa attempted after the 400");
+  assert.ok(
+    result.attempts.some((a) => a.provider === "tavily" && a.outcome === "failed:bad-request"),
+    "the rejection stays visible in attempts",
+  );
+});
+
 test("auth failure marks the KEY unhealthy; 500/network keep it healthy", async () => {
   // 1) auth failure → next search skips the bad key and tries the pool
   const authErr = Object.assign(new Error("401"), { code: "auth" });

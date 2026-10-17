@@ -72,6 +72,18 @@ dsh-web-tools 将 Exa、Tavily、Firecrawl、Parallel、Brave、You.com、Jina�
   <img src="https://raw.githubusercontent.com/A3Boy/dsh-web-tools/main/assets/searchOrderAndRouting.png" width="900" alt="dsh-web-tools 搜索策略与多源调度" />
 </p>
 
+### 查询指令
+
+DSH 的 `web_search` 只接受 `queries: string[]`，因此搜索约束直接写在 query 里，并在真正请求前被剥离：
+
+| 指令 | 示例 | 作用 |
+|---|---|---|
+| `country:<code>` / `region:<code>` | `solar subsidies country:de` | 指定 Provider 的国家参数。接受 ISO 3166-1 alpha-2 代码（`de`、`us`、`gb`）或英文国名（`germany`、`united kingdom`）。 |
+| `site:example.com` / `-site:example.com` | `site:reuters.com OpenAI` | 强制包含 / 排除域名 |
+| `after:YYYY-MM-DD` / `before:YYYY-MM-DD` | `OpenAI news after:2026-01-01` | 显式日期范围 |
+
+国家参数的优先级（从高到低）：模型显式写出的 `country:` 指令 → query 文本中提到的国家 → Provider 自身默认（完全不下发该参数）→ 该 Provider 拒绝请求时切换到下一个搜索源。无法识别的代码会被忽略而不是下发，查询照常执行，工具返回结果里会说明该指令被丢弃。
+
 ## 8 大 Web Provider 原生能力深度适配
 
 统一的是 DSH 的工具接口和搜索语义，不统一的是各家 Provider 的能力。

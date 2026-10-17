@@ -81,7 +81,10 @@ test("classifyFailure: retryable vs non-retryable vs terminal", () => {
   assert.equal(classifyFailure({ code: "network" }), "retryable");
   assert.equal(classifyFailure({ code: "unavailable" }), "retryable");
   assert.equal(classifyFailure({ code: "auth" }), "retryable"); // bad key → fallback + mark unhealthy
-  assert.equal(classifyFailure({ code: "bad-request" }), "non-retryable");
+  // A provider-side 400 is that provider rejecting a parameter, not a broken
+  // configuration: the next source may serve the same query (Tavily once
+  // rejected every ISO country code), so it falls through instead of aborting.
+  assert.equal(classifyFailure({ code: "bad-request" }), "retryable");
   assert.equal(classifyFailure({ code: "config" }), "non-retryable");
   assert.equal(classifyFailure({ code: "mystery" }), "retryable");
   // caller cancellation terminates the whole chain — never fallback

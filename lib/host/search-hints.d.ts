@@ -35,6 +35,7 @@ export interface DomainHints {
 }
 export interface LocaleHint {
     language?: string;
+    /** ISO 3166-1 alpha-2, from the model's `country:` directive or inferred from the query. */
     country?: string;
 }
 export interface SearchHints {
@@ -45,6 +46,12 @@ export interface SearchHints {
     freshness?: FreshnessHint;
     domains?: DomainHints;
     locale?: LocaleHint;
+    /**
+     * The `country:` / `region:` directive the model wrote, if any.
+     * `code` is absent when the value did not resolve — the caller should fall
+     * back to inference (and may tell the model the value was ignored).
+     */
+    countryDirective?: CountryDirective;
     /** Cleaned query string with explicit operators (e.g. site:) removed */
     cleanQuery: string;
     /** The original unmodified query */
@@ -58,6 +65,25 @@ export declare function formatDateYMD(d: Date): string;
  * Calculate an after_date string from a preset relative to a reference date.
  */
 export declare function calculateAfterDate(preset: FreshnessPreset, now?: Date): string;
+/** Result of parsing a `country:` directive out of a query. */
+export interface CountryDirective {
+    /** Text as written after the operator, e.g. "de" or "united states". */
+    raw: string;
+    /** Canonical alpha-2 code, or `undefined` when the value did not resolve. */
+    code?: string;
+    /** Exact substring to strip from the clean query. */
+    matched: string;
+}
+/**
+ * Parse the first `country:` / `region:` directive.
+ *
+ * The value may be a code or an English name, and may be followed by more query
+ * text ("country:de solar policy"), so the longest token prefix that resolves to
+ * a known country wins. An unresolvable value still reports `raw` with no
+ * `code`: the directive is stripped from the query either way, and callers fall
+ * through to inference instead of forwarding something the API would reject.
+ */
+export declare function parseCountryDirective(query: string): CountryDirective | undefined;
 /**
  * Extract structured SearchHints from a raw query.
  * Pure function: deterministic, fast, testable, zero side-effects.

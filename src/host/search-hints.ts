@@ -14,6 +14,8 @@
  * @module
  */
 
+import { resolveCountryCode } from "./countries.ts";
+
 export type SearchTopic = "general" | "news" | "finance" | "code" | "research";
 
 export type PlatformHint = "xiaohongshu" | "x";
@@ -41,6 +43,7 @@ export interface DomainHints {
 
 export interface LocaleHint {
   language?: string;
+  /** ISO 3166-1 alpha-2, from the model's `country:` directive or inferred from the query. */
   country?: string;
 }
 
@@ -52,6 +55,12 @@ export interface SearchHints {
   freshness?: FreshnessHint;
   domains?: DomainHints;
   locale?: LocaleHint;
+  /**
+   * The `country:` / `region:` directive the model wrote, if any.
+   * `code` is absent when the value did not resolve — the caller should fall
+   * back to inference (and may tell the model the value was ignored).
+   */
+  countryDirective?: CountryDirective;
   /** Cleaned query string with explicit operators (e.g. site:) removed */
   cleanQuery: string;
   /** The original unmodified query */
@@ -160,7 +169,10 @@ const GLOBAL_SCOPE_INDICATORS = [
   /(?:国内外|海内外|全球|世界范围|跨国|国际)/,
 ];
 
-// Country indicators (only assign country when explicitly mentioned in the query)
+// Country indicators (only assign country when explicitly mentioned in the query).
+// Values are ISO 3166-1 alpha-2: that is what Brave, Exa, Firecrawl and You.com
+// accept. Providers using a different vocabulary must translate before sending —
+// Tavily wants lowercase country names, see `resolveTavilyCountry`.
 const EXPLICIT_COUNTRY_PATTERNS: Array<{ re: RegExp; country: string }> = [
   { re: /(?:美国|美股|美联储|United States|USA|\bUS\b)/i, country: "US" },
   { re: /(?:中国|国内|A股|China|\bCN\b)/i, country: "CN" },
@@ -171,6 +183,53 @@ const EXPLICIT_COUNTRY_PATTERNS: Array<{ re: RegExp; country: string }> = [
   { re: /(?:法国|France|\bFR\b)/i, country: "FR" },
   { re: /(?:加拿大|Canada|\bCA\b)/i, country: "CA" },
 ];
+
+/**
+ * Explicit geo directive the model can write into a query: `country:de`,
+ * `country:united states`, `region=jp`.
+ *
+ * This is the only way the model can pin a country, because DSH's `web_search`
+ * schema is owned by `dsh-tool-web` and accepts nothing but `queries: string[]`.
+ * It outranks inference from country names in the query text, which is a guess:
+ * a mention says what the query is *about*, not where results should come from.
+ */
+const COUNTRY_DIRECTIVE_RE = /(?:^|\s)((?:country|region)\s*[:=]\s*)([A-Za-z][A-Za-z\- ]{0,40})?/i;
+
+/** Result of parsing a `country:` directive out of a query. */
+export interface CountryDirective {
+  /** Text as written after the operator, e.g. "de" or "united states". */
+  raw: string;
+  /** Canonical alpha-2 code, or `undefined` when the value did not resolve. */
+  code?: string;
+  /** Exact substring to strip from the clean query. */
+  matched: string;
+}
+
+/**
+ * Parse the first `country:` / `region:` directive.
+ *
+ * The value may be a code or an English name, and may be followed by more query
+ * text ("country:de solar policy"), so the longest token prefix that resolves to
+ * a known country wins. An unresolvable value still reports `raw` with no
+ * `code`: the directive is stripped from the query either way, and callers fall
+ * through to inference instead of forwarding something the API would reject.
+ */
+export function parseCountryDirective(query: string): CountryDirective | undefined {
+  const m = COUNTRY_DIRECTIVE_RE.exec(query);
+  if (!m) return undefined;
+
+  const [full, prefix, tail] = m;
+  const value = (tail ?? "").trim();
+  if (!value) return { raw: "", matched: full.trim() };
+
+  const tokens = value.split(/\s+/).slice(0, 4);
+  for (let n = tokens.length; n >= 1; n--) {
+    const candidate = tokens.slice(0, n).join(" ");
+    const code = resolveCountryCode(candidate);
+    if (code) return { raw: candidate, code, matched: `${prefix}${candidate}` };
+  }
+  return { raw: tokens[0] ?? value, matched: `${prefix}${tokens[0] ?? value}` };
+}
 
 /**
  * Extract structured SearchHints from a raw query.
@@ -237,6 +296,12 @@ export function extractSearchHints(query: string, now: Date = new Date()): Searc
     cleanQuery = cleanQuery.replace(BEFORE_DATE_RE, " ");
   }
 
+  // 2.1 Extract an explicit `country:` / `region:` directive (model-specified).
+  // Stripped from the query whether or not it resolves — an invalid value must
+  // not leak into the provider query as literal text.
+  const countryDirective = parseCountryDirective(rawQuery);
+  if (countryDirective) cleanQuery = cleanQuery.replace(countryDirective.matched, " ");
+
   // 3. Topic classification (needed before freshness rules to avoid over-constraining evergreen technical queries)
   let topic: SearchTopic = "general";
   if (includeDomains.some((d) => d.includes("github.com") || d.includes("gitlab.com") || d.includes("stackoverflow.com")) ||
@@ -296,7 +361,10 @@ export function extractSearchHints(query: string, now: Date = new Date()): Searc
       : undefined;
 
   // 6. Locale hint detection (language decoupled from country!)
-  // ONLY set country when explicitly mentioned in query text.
+  // Country precedence: an explicit `country:` directive (the model asked for a
+  // region) outranks inference from the query text (a country was merely
+  // mentioned). Inference keeps the long-standing "mention = region" rule, but
+  // stays suppressed for multi-country / global-scope queries.
   let language: string | undefined;
   const hasChinese = /[\u4e00-\u9fa5]/.test(rawQuery);
   const hasJapanese = /[\u3040-\u30ff]/.test(rawQuery);
@@ -307,12 +375,16 @@ export function extractSearchHints(query: string, now: Date = new Date()): Searc
   }
 
   let country: string | undefined;
-  const isGlobalScope = GLOBAL_SCOPE_INDICATORS.some((re) => re.test(rawQuery));
-  if (!isGlobalScope) {
-    const matchedCountries = EXPLICIT_COUNTRY_PATTERNS.filter((p) => p.re.test(rawQuery)).map((p) => p.country);
-    const uniqueCountries = [...new Set(matchedCountries)];
-    if (uniqueCountries.length === 1) {
-      country = uniqueCountries[0];
+  if (countryDirective?.code) {
+    country = countryDirective.code;
+  } else {
+    const isGlobalScope = GLOBAL_SCOPE_INDICATORS.some((re) => re.test(rawQuery));
+    if (!isGlobalScope) {
+      const matchedCountries = EXPLICIT_COUNTRY_PATTERNS.filter((p) => p.re.test(rawQuery)).map((p) => p.country);
+      const uniqueCountries = [...new Set(matchedCountries)];
+      if (uniqueCountries.length === 1) {
+        country = uniqueCountries[0];
+      }
     }
   }
 
@@ -332,6 +404,7 @@ export function extractSearchHints(query: string, now: Date = new Date()): Searc
     freshness,
     domains,
     locale,
+    countryDirective,
     cleanQuery,
     rawQuery,
   };

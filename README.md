@@ -72,6 +72,18 @@ While keeping the tool interface unified, dsh-web-tools normalizes search intent
   <img src="https://raw.githubusercontent.com/A3Boy/dsh-web-tools/main/assets/searchOrderAndRouting.png" width="900" alt="dsh-web-tools search strategy and multi-provider routing" />
 </p>
 
+### Query directives
+
+DSH's `web_search` takes only `queries: string[]`, so search constraints are written inline and stripped before the provider call:
+
+| Directive | Example | Effect |
+|---|---|---|
+| `country:<code>` / `region:<code>` | `solar subsidies country:de` | Pins the provider's country parameter. Accepts an ISO 3166-1 alpha-2 code (`de`, `us`, `gb`) or an English name (`germany`, `united kingdom`). |
+| `site:example.com` / `-site:example.com` | `site:reuters.com OpenAI` | Hard include / exclude domain |
+| `after:YYYY-MM-DD` / `before:YYYY-MM-DD` | `OpenAI news after:2026-01-01` | Explicit date range |
+
+Country precedence, highest first: an explicit `country:` directive → a country mentioned in the query text → the provider's own default (no parameter at all) → the next provider in the fallback chain if this one rejects the request. An unrecognised code is ignored rather than forwarded, the query still runs, and the tool result reports that the directive was dropped.
+
 ## Native-Capability Adaptation Across 8 Web Providers
 
 The tool interface and search semantics are unified for the DSH agent, but underlying provider capabilities are not.

@@ -36,6 +36,7 @@ import { XiaohongshuSource } from "./sources/xiaohongshu.ts";
 import { XSource } from "./sources/x.ts";
 import { createNativeBrowserRuntime } from "./browser/index.ts";
 import { extractSearchHints } from "./search-hints.ts";
+import { countryDirectiveNotice, registerCountryGuidance } from "./country-guidance.ts";
 import type { SourceFetchOutcome } from "./sources/types.ts";
 
 /** Cordis plugin name used by loader diagnostics. */
@@ -252,15 +253,20 @@ export function apply(ctx: WebToolsContext, config?: unknown) {
     id: PROVIDER_ID,
     available: () => generalSearchProvider.available(),
     search: async (request: { query: string; maxResults?: number }, signal?: AbortSignal) => {
+      const hints = extractSearchHints(request.query);
       const outcome = await sourceRegistry.search(
         request.query,
-        { maxResults: request.maxResults, hints: extractSearchHints(request.query) },
+        { maxResults: request.maxResults, hints },
         signal,
       );
       if (outcome.error) {
         throw new Error(`[${outcome.error.code}] ${outcome.error.message}`);
       }
+      // An unresolvable `country:` directive is reported to the model instead of
+      // being swallowed — otherwise it keeps emitting the same invalid code.
+      const notice = countryDirectiveNotice(hints);
       return {
+        ...(notice ? { content: notice } : {}),
         sources: outcome.items.map((item) => ({
           url: item.url,
           title: item.title,
@@ -272,6 +278,10 @@ export function apply(ctx: WebToolsContext, config?: unknown) {
     },
   };
   ctx.web.registerSearchProvider(routedSearchProvider as never);
+
+  // Teach the model the `country:` operator (optional: the `systemPrompt`
+  // service is never required, so a host without it still mounts this plugin).
+  registerCountryGuidance(ctx);
 
   // Wrap fetch provider with SpecializedSourceRouter
   const routedFetchProvider = {

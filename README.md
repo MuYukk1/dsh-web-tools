@@ -157,6 +157,19 @@ dsh plugin --profile web remove dsh-web-tools
 
 Restart `dsh web` and navigate to `Settings` → `Web Search`.
 
+### DSH host compatibility
+
+| DSH host | Status |
+| --- | --- |
+| `0.2.1-rc.2` | Supported (current release) |
+| `0.2.0-rc.1` – `0.2.0` | Supported |
+| `0.1.0-rc.6` – `0.1.7` | Supported |
+
+The range is declared in `engines.dsh`. DSH 0.2.1 reads that field **instead of** the `@deepseek-ai/dsh*` peer ranges, so both are kept in step here. Two host changes in the 0.2.1 line matter:
+
+- **`webRuntime` is gone.** DSH 0.2.1 replaced that service with `webStartup` (listener and trust configuration moved with it). This plugin no longer injects it — a plugin that still lists a service that never mounts stays pending, which silently disables every provider, the settings API and the page.
+- **DSH now ships its own web-search page.** `Plugins` → `网页搜索设置` / `Web Search` (section id `web-search`) configures DeepSeek's own Search and Fetch APIs and writes the same `web` config this plugin pins to `dsh-web-tools`. Choosing a DeepSeek provider there, or exporting `DSH_WEB_SEARCH_PROVIDER`, bypasses this plugin until `dsh-web-tools` is pinned again. This plugin's page stays at `Settings` → `Web Search` (id `web-tools`).
+
 ---
 
 ## Provider Capabilities

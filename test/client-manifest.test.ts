@@ -28,6 +28,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import semver from "semver";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const readPkg = () =>
@@ -95,11 +96,19 @@ test("every injected package is also covered by a declared peer range", () => {
       Object.hasOwn(peers, name),
       `injected package ${name} must also appear in peerDependencies so its compatible range is declared`,
     );
-    assert.match(
-      peers[name],
-      /\^0\.1\.0-rc\.6 \|\| \^0\.2\.0-0/,
-      `${name} peer range must keep covering the 0.1 and 0.2 lines`,
-    );
+    // Prerelease tuples matter: a range that only names a 0.2.0 prerelease
+    // comparator does not cover 0.2.1-rc.2 for npm/pnpm (plain semver), and DSH
+    // 0.2.1 matches with includePrerelease — both readings must hold.
+    for (const version of ["0.1.0-rc.6", "0.2.0-rc.2", "0.2.1-rc.2"]) {
+      assert.ok(
+        semver.satisfies(version, peers[name]),
+        `${name} peer range "${peers[name]}" must cover ${version} without includePrerelease`,
+      );
+      assert.ok(
+        semver.satisfies(version, peers[name], { includePrerelease: true }),
+        `${name} peer range "${peers[name]}" must cover ${version} for DSH's own check`,
+      );
+    }
   }
 });
 

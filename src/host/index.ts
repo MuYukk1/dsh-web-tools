@@ -11,6 +11,7 @@
  * @module
  */
 import type { WebToolsContext } from "./context-types.ts";
+import { HOST_INJECT } from "./inject.ts";
 import { Config as PluginConfig, installConfig, type WebToolsSettings } from "./config.ts";
 import { createSearchProvider, createFetchProvider, createPoolStore, PROVIDER_ID, WebToolsWebError } from "./registry.ts";
 import { registerRoutes } from "./routes.ts";
@@ -40,8 +41,11 @@ import type { SourceFetchOutcome } from "./sources/types.ts";
 /** Cordis plugin name used by loader diagnostics. */
 export const name = "dsh-web-tools";
 
-/** Services required by this plugin. */
-export const inject = ["webServer", "webRuntime", "settings", "credentials", "web", "agents", "commands"];
+/**
+ * Services required by this plugin — see `./inject.ts` for why `webRuntime` is
+ * gone (DSH 0.2.1 replaced it with `webStartup`).
+ */
+export const inject = HOST_INJECT;
 
 /**
  * Plugin-level config: the same schemastery schema as the settings namespace.

@@ -16,8 +16,11 @@ import { PROVIDER_ID } from "./registry.ts";
 import type { SourceFetchOutcome } from "./sources/types.ts";
 /** Cordis plugin name used by loader diagnostics. */
 export declare const name = "dsh-web-tools";
-/** Services required by this plugin. */
-export declare const inject: string[];
+/**
+ * Services required by this plugin — see `./inject.ts` for why `webRuntime` is
+ * gone (DSH 0.2.1 replaced it with `webStartup`).
+ */
+export declare const inject: readonly string[];
 /**
  * Plugin-level config: the same schemastery schema as the settings namespace.
  * Cordis requires `Config` to be a schema instance (it calls `.validate` when

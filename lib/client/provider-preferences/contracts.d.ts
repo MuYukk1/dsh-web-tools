@@ -24,14 +24,14 @@ export declare const PARALLEL_ALL_MODES: readonly ["advanced", "basic", "fast", 
 export declare const TAVILY_DEPTH_OPTIONS: readonly ["basic", "advanced", "fast", "ultra-fast"];
 /** Whether chunks_per_source should be shown for a given Tavily depth and autoParams state. */
 export declare function tavilyChunksVisible(depth: string, autoParams: boolean): boolean;
-/** Exa search type options. Exa 3.0 recommends auto / lite / deep; the rest are legacy (still served). */
-export declare const EXA_SEARCH_TYPE_OPTIONS: readonly ["auto", "lite", "fast", "instant", "deep-lite", "deep", "deep-reasoning"];
+/** Exa search type options — the Exa 3.0 lineup (legacy fast / instant / deep-reasoning removed). */
+export declare const EXA_SEARCH_TYPE_OPTIONS: readonly ["auto", "lite", "deep-lite", "deep"];
 /** Map an Exa mode to its SIMPLE (primary) UI bucket. */
 export declare function exaPrimaryMode(mode: string): "auto" | "fast" | "deep";
 /**
  * Lossless primary-mode guard: clicking "深入" must never overwrite an
- * existing precise deep variant (deep-lite / deep / deep-reasoning) with
- * plain "deep". The precise value is only changeable in the native picker.
+ * existing precise deep variant (deep-lite / deep) with plain "deep". The
+ * precise value is only changeable in the native picker.
  */
 export declare function exaPrimaryApplyable(v: string, currentMode: string): boolean;
 /** You.com extraction mode options. */

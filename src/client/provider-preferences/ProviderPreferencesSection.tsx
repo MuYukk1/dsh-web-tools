@@ -15,6 +15,7 @@ import { text, surface, state as stateColor } from "../theme.ts";
 import { Switch } from "../WebToolsSection.tsx";
 import { SegmentedControl } from "../ui/SegmentedControl.tsx";
 import { tavilyChunksVisible, PARALLEL_PRIMARY_MODES, PARALLEL_EXPERIMENTAL_MODES, EXA_SEARCH_TYPE_OPTIONS, exaPrimaryMode, exaPrimaryApplyable } from "./contracts.ts";
+import { normalizeExaSearchType } from "../../shared/provider-options.ts";
 import { adoptWebToolsStyles } from "../ui/styles.ts";
 
 type TFunc = (key: string, ...args: unknown[]) => string;
@@ -244,19 +245,16 @@ function ProviderControls(props: {
   switch (provider) {
     // ------------------------------------------------------------------ Exa
     case "exa": {
-      const mode = String(raw("searchType", "auto"));
+      // normalizeExaSearchType migrates legacy stored values (fast/instant →
+      // lite, deep-reasoning → deep) so a pre-3.0 setting still renders and
+      // applies losslessly.
+      const mode = normalizeExaSearchType(raw("searchType", "auto")) ?? "auto";
       const desc =
-        mode === "fast"
-          ? t("prefsExaFastDesc")
-          : mode === "instant"
-            ? t("prefsExaInstantDesc")
-            : mode === "lite"
-              ? t("prefsExaLiteDesc")
-              : mode === "deep-reasoning"
-                ? t("prefsExaDeepReasoningDesc")
-                : mode.startsWith("deep")
-                  ? t("prefsExaDeepDesc")
-                  : t("prefsExaAutoDesc");
+        mode === "lite"
+          ? t("prefsExaLiteDesc")
+          : mode.startsWith("deep")
+            ? t("prefsExaDeepDesc")
+            : t("prefsExaAutoDesc");
       const maxAgeHours = raw("maxAgeHours", undefined);
       const freshness: "auto" | "live" | "cache" = maxAgeHours === 0 ? "live" : maxAgeHours === -1 ? "cache" : "auto";
       const handlePrimaryMode = (v: string) => {
@@ -271,11 +269,8 @@ function ProviderControls(props: {
         const keyHint: Record<string, string> = {
           auto: "Auto",
           lite: "Lite",
-          fast: "Fast",
-          instant: "Instant",
           "deep-lite": "DeepLite",
           deep: "Deep",
-          "deep-reasoning": "DeepReasoning",
         };
         return {
           id: m,
@@ -287,11 +282,8 @@ function ProviderControls(props: {
         const keyHint: Record<string, string> = {
           auto: "Auto",
           lite: "Lite",
-          fast: "Fast",
-          instant: "Instant",
           "deep-lite": "DeepLite",
           deep: "Deep",
-          "deep-reasoning": "DeepReasoning",
         };
         return t(`prefsExaNative${keyHint[mode] ?? "Auto"}`);
       })();

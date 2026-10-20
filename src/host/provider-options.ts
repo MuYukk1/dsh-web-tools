@@ -15,6 +15,7 @@ import type {
   JinaProviderOptions,
   ProviderOptionView,
 } from "../shared/provider-options.ts";
+import { normalizeExaSearchType } from "../shared/provider-options.ts";
 
 export const DEFAULT_EXA_OPTIONS: Required<ExaProviderOptions> = {
   searchType: "auto",
@@ -65,10 +66,11 @@ export function sanitizeProviderOptions(
 
   switch (provider) {
     case "exa": {
-      const validTypes = ["auto", "fast", "instant", "deep-lite", "deep", "deep-reasoning"];
-      if (typeof raw.searchType === "string" && validTypes.includes(raw.searchType)) {
-        out.searchType = raw.searchType;
-      }
+      // normalizeExaSearchType both whitelists the Exa 3.0 lineup and
+      // migrates legacy stored values (fast/instant → lite, deep-reasoning →
+      // deep), so settings saved before v0.3.9 keep their intent.
+      const searchType = normalizeExaSearchType(raw.searchType);
+      if (searchType) out.searchType = searchType;
       if (typeof raw.maxAgeHours === "number" && (raw.maxAgeHours >= -1 && raw.maxAgeHours <= 8760)) {
         out.maxAgeHours = Math.round(raw.maxAgeHours);
       }

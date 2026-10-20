@@ -188,7 +188,7 @@ The range is declared in `engines.dsh`. DSH 0.2.1 reads that field **instead of*
 
 | Provider | Search | Fetch / Extract | Key Integrations & Adaptations | Quota Inspection |
 | --- | --- | --- | --- | --- |
-| [Exa](https://exa.ai) | Yes | Yes, `/contents` | Semantic retrieval (`auto` / `fast` / `deep`), `category` mappings, query-aware highlights, ISO-8601 date ranges | Dashboard only |
+| [Exa](https://exa.ai) | Yes | Yes, `/contents` | Exa 3.0-ready: semantic retrieval (`auto` / `lite` / `deep`; `fast` / `instant` / `deep-reasoning` kept as legacy), `category` mappings, query-aware highlights (Dynamic Highlights GA), response `notices` surfaced to the model, ISO-8601 date ranges | Dashboard only |
 | [Tavily](https://tavily.com) | Yes | Yes, `/extract` | Search depths (`basic` / `advanced` / `fast` / `ultra-fast`); the first three support chunking, plus `news` / `finance`, date, country, and domain parameters | Official API |
 | [Firecrawl](https://firecrawl.dev) | Yes | Yes, `/scrape` | Technical queries map to `github`, academic queries to `research`; supports `tbs`, domain constraints, and clean Markdown extraction | Official API |
 | [Parallel](https://parallel.ai) | Yes | Yes, `/v1/extract` | Agent dual-layer semantic search (`advanced` / `basic` / `turbo`), `objective` soft-steering, `source_policy` | Dashboard only |

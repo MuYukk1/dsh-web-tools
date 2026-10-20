@@ -24,8 +24,8 @@ export declare const PARALLEL_ALL_MODES: readonly ["advanced", "basic", "fast", 
 export declare const TAVILY_DEPTH_OPTIONS: readonly ["basic", "advanced", "fast", "ultra-fast"];
 /** Whether chunks_per_source should be shown for a given Tavily depth and autoParams state. */
 export declare function tavilyChunksVisible(depth: string, autoParams: boolean): boolean;
-/** Exa search type options. */
-export declare const EXA_SEARCH_TYPE_OPTIONS: readonly ["auto", "fast", "instant", "deep-lite", "deep", "deep-reasoning"];
+/** Exa search type options. Exa 3.0 recommends auto / lite / deep; the rest are legacy (still served). */
+export declare const EXA_SEARCH_TYPE_OPTIONS: readonly ["auto", "lite", "fast", "instant", "deep-lite", "deep", "deep-reasoning"];
 /** Map an Exa mode to its SIMPLE (primary) UI bucket. */
 export declare function exaPrimaryMode(mode: string): "auto" | "fast" | "deep";
 /**

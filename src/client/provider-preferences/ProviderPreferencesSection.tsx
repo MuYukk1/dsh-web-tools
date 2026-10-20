@@ -245,18 +245,32 @@ function ProviderControls(props: {
     // ------------------------------------------------------------------ Exa
     case "exa": {
       const mode = String(raw("searchType", "auto"));
-      const desc = mode === "fast" ? t("prefsExaFastDesc") : mode === "instant" ? t("prefsFastDesc") : mode.startsWith("deep") ? t("prefsExaDeepDesc") : t("prefsExaAutoDesc");
+      const desc =
+        mode === "fast"
+          ? t("prefsExaFastDesc")
+          : mode === "instant"
+            ? t("prefsExaInstantDesc")
+            : mode === "lite"
+              ? t("prefsExaLiteDesc")
+              : mode === "deep-reasoning"
+                ? t("prefsExaDeepReasoningDesc")
+                : mode.startsWith("deep")
+                  ? t("prefsExaDeepDesc")
+                  : t("prefsExaAutoDesc");
       const maxAgeHours = raw("maxAgeHours", undefined);
       const freshness: "auto" | "live" | "cache" = maxAgeHours === 0 ? "live" : maxAgeHours === -1 ? "cache" : "auto";
       const handlePrimaryMode = (v: string) => {
         if (!exaPrimaryApplyable(v, mode)) return;
-        setValue("searchType", v, "auto");
+        // The "fast" bucket applies Exa's recommended low-latency type: lite
+        // runs the same search as legacy fast at a lower price (Exa 3.0).
+        setValue("searchType", v === "fast" ? "lite" : v, "auto");
       };
       const primaryValue = exaPrimaryMode(mode);
 
       const exaNativeItems: MenuItem[] = EXA_SEARCH_TYPE_OPTIONS.map((m) => {
         const keyHint: Record<string, string> = {
           auto: "Auto",
+          lite: "Lite",
           fast: "Fast",
           instant: "Instant",
           "deep-lite": "DeepLite",
@@ -272,6 +286,7 @@ function ProviderControls(props: {
       const currentNativeLabel = (() => {
         const keyHint: Record<string, string> = {
           auto: "Auto",
+          lite: "Lite",
           fast: "Fast",
           instant: "Instant",
           "deep-lite": "DeepLite",

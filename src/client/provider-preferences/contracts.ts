@@ -36,13 +36,15 @@ export function tavilyChunksVisible(depth: string, autoParams: boolean): boolean
   return depth === "advanced" && !autoParams;
 }
 
-/** Exa search type options. */
-export const EXA_SEARCH_TYPE_OPTIONS = ["auto", "fast", "instant", "deep-lite", "deep", "deep-reasoning"] as const;
+/** Exa search type options. Exa 3.0 recommends auto / lite / deep; the rest are legacy (still served). */
+export const EXA_SEARCH_TYPE_OPTIONS = ["auto", "lite", "fast", "instant", "deep-lite", "deep", "deep-reasoning"] as const;
 
 /** Map an Exa mode to its SIMPLE (primary) UI bucket. */
 export function exaPrimaryMode(mode: string): "auto" | "fast" | "deep" {
   if (mode === "auto") return "auto";
-  if (mode === "fast" || mode === "instant") return "fast";
+  // lite is Exa 3.0's recommended low-latency type — it belongs in the same
+  // bucket as the legacy fast / instant it replaces.
+  if (mode === "lite" || mode === "fast" || mode === "instant") return "fast";
   return "deep";
 }
 

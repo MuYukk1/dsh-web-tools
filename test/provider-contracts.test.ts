@@ -65,11 +65,14 @@ test("Tavily: chunks visible only when depth is advanced AND autoParams is false
 
 // ------ Exa search type contracts ------
 test("Exa: search type options match the official API", () => {
-  assert.deepStrictEqual([...EXA_SEARCH_TYPE_OPTIONS], ["auto", "fast", "instant", "deep-lite", "deep", "deep-reasoning"]);
+  // Exa 3.0 (2026-10-19) recommends auto / lite / deep; the rest are legacy
+  // but still served, so they stay selectable for existing settings.
+  assert.deepStrictEqual([...EXA_SEARCH_TYPE_OPTIONS], ["auto", "lite", "fast", "instant", "deep-lite", "deep", "deep-reasoning"]);
 });
 
 test("Exa: primary mode mapping collapses instant into fast and deep variants into deep", () => {
   assert.strictEqual(exaPrimaryMode("auto"), "auto");
+  assert.strictEqual(exaPrimaryMode("lite"), "fast");
   assert.strictEqual(exaPrimaryMode("fast"), "fast");
   assert.strictEqual(exaPrimaryMode("instant"), "fast");
   assert.strictEqual(exaPrimaryMode("deep-lite"), "deep");

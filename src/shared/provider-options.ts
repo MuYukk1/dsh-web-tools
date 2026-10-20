@@ -6,7 +6,12 @@
  */
 
 export interface ExaProviderOptions {
-  searchType?: "auto" | "fast" | "instant" | "deep-lite" | "deep" | "deep-reasoning";
+  /**
+   * Exa /search `type`. Exa 3.0 (2026-10-19) recommends `auto`, `lite` and
+   * `deep`; `fast` / `instant` / `deep-reasoning` are legacy but still served.
+   * `lite` serves cached content only and rejects freshness parameters.
+   */
+  searchType?: "auto" | "lite" | "fast" | "instant" | "deep-lite" | "deep" | "deep-reasoning";
   maxAgeHours?: number;
 }
 

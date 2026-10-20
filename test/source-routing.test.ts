@@ -273,6 +273,24 @@ test("P7.0 SpecializedSourceRegistry: routes non-platform query directly to gene
   assert.equal(outcome.items[0].title, "DeepSeek");
 });
 
+test("SpecializedSourceRegistry: provider notice content survives the general-web round trip", async () => {
+  const registry = new SpecializedSourceRegistry();
+
+  const mockGeneralSearch: any = {
+    search: async () => ({
+      sources: [{ url: "https://exa.ai", title: "Exa" }],
+      // e.g. an Exa 3.0 notice, which its docs say to pass to the model
+      content: "Exa: no page matched site:example.com",
+    }),
+  };
+
+  registry.setFallbackProviders(mockGeneralSearch, undefined);
+
+  const outcome = await registry.search("example");
+  assert.equal(outcome.retrievalMode, "general-web");
+  assert.equal(outcome.content, "Exa: no page matched site:example.com");
+});
+
 test("SpecializedSourceRegistry: platformEnabled toggle disables platform routing and falls back to general search", async () => {
   const registry = new SpecializedSourceRegistry();
   let nativeCalled = false;

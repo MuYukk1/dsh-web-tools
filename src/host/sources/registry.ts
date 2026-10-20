@@ -116,7 +116,9 @@ export class SpecializedSourceRegistry {
           snippet: s.snippet,
           platform: "general" as const,
         }));
-        return { items, retrievalMode: "general-web" };
+        // Provider notes (e.g. Exa notices) must survive the round trip — the
+        // routed provider re-attaches them to the tool result.
+        return { items, retrievalMode: "general-web", ...(res.content ? { content: res.content } : {}) };
       }
       return { items: [] };
     }

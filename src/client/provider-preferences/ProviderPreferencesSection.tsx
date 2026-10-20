@@ -15,6 +15,7 @@ import { text, surface, state as stateColor } from "../theme.ts";
 import { Switch } from "../WebToolsSection.tsx";
 import { SegmentedControl } from "../ui/SegmentedControl.tsx";
 import { tavilyChunksVisible, PARALLEL_PRIMARY_MODES, PARALLEL_EXPERIMENTAL_MODES, EXA_SEARCH_TYPE_OPTIONS, exaPrimaryMode, exaPrimaryApplyable } from "./contracts.ts";
+import { normalizeExaSearchType } from "../../shared/provider-options.ts";
 import { adoptWebToolsStyles } from "../ui/styles.ts";
 
 type TFunc = (key: string, ...args: unknown[]) => string;
@@ -244,24 +245,32 @@ function ProviderControls(props: {
   switch (provider) {
     // ------------------------------------------------------------------ Exa
     case "exa": {
-      const mode = String(raw("searchType", "auto"));
-      const desc = mode === "fast" ? t("prefsExaFastDesc") : mode === "instant" ? t("prefsFastDesc") : mode.startsWith("deep") ? t("prefsExaDeepDesc") : t("prefsExaAutoDesc");
+      // normalizeExaSearchType migrates legacy stored values (fast/instant →
+      // lite, deep-reasoning → deep) so a pre-3.0 setting still renders and
+      // applies losslessly.
+      const mode = normalizeExaSearchType(raw("searchType", "auto")) ?? "auto";
+      const desc =
+        mode === "lite"
+          ? t("prefsExaLiteDesc")
+          : mode.startsWith("deep")
+            ? t("prefsExaDeepDesc")
+            : t("prefsExaAutoDesc");
       const maxAgeHours = raw("maxAgeHours", undefined);
       const freshness: "auto" | "live" | "cache" = maxAgeHours === 0 ? "live" : maxAgeHours === -1 ? "cache" : "auto";
       const handlePrimaryMode = (v: string) => {
         if (!exaPrimaryApplyable(v, mode)) return;
-        setValue("searchType", v, "auto");
+        // The "fast" bucket applies Exa's recommended low-latency type: lite
+        // runs the same search as legacy fast at a lower price (Exa 3.0).
+        setValue("searchType", v === "fast" ? "lite" : v, "auto");
       };
       const primaryValue = exaPrimaryMode(mode);
 
       const exaNativeItems: MenuItem[] = EXA_SEARCH_TYPE_OPTIONS.map((m) => {
         const keyHint: Record<string, string> = {
           auto: "Auto",
-          fast: "Fast",
-          instant: "Instant",
+          lite: "Lite",
           "deep-lite": "DeepLite",
           deep: "Deep",
-          "deep-reasoning": "DeepReasoning",
         };
         return {
           id: m,
@@ -272,11 +281,9 @@ function ProviderControls(props: {
       const currentNativeLabel = (() => {
         const keyHint: Record<string, string> = {
           auto: "Auto",
-          fast: "Fast",
-          instant: "Instant",
+          lite: "Lite",
           "deep-lite": "DeepLite",
           deep: "Deep",
-          "deep-reasoning": "DeepReasoning",
         };
         return t(`prefsExaNative${keyHint[mode] ?? "Auto"}`);
       })();

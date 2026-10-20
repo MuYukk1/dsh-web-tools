@@ -49,6 +49,7 @@ export async function fallbackSearchToGeneralWeb(
     return {
       items,
       retrievalMode: "degraded-web",
+      ...(rawResults.content ? { content: rawResults.content } : {}),
     };
   } catch (err: any) {
     return {

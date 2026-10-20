@@ -262,11 +262,16 @@ export function apply(ctx: WebToolsContext, config?: unknown) {
       if (outcome.error) {
         throw new Error(`[${outcome.error.code}] ${outcome.error.message}`);
       }
-      // An unresolvable `country:` directive is reported to the model instead of
-      // being swallowed — otherwise it keeps emitting the same invalid code.
-      const notice = countryDirectiveNotice(hints);
+      // Model-facing notes, joined when several apply: an unresolvable
+      // `country:` directive (reported instead of swallowed — otherwise the
+      // model keeps emitting the same invalid code) and provider notices
+      // (e.g. Exa 3.0 notices, which its docs say to pass to the model with
+      // the results).
+      const notes = [countryDirectiveNotice(hints), outcome.content].filter(
+        (s): s is string => typeof s === "string" && s.length > 0,
+      );
       return {
-        ...(notice ? { content: notice } : {}),
+        ...(notes.length > 0 ? { content: notes.join("\n") } : {}),
         sources: outcome.items.map((item) => ({
           url: item.url,
           title: item.title,

@@ -5,8 +5,34 @@
  * @module
  */
 
+/** The Exa /search `type` values the plugin offers — the Exa 3.0 lineup. */
+export type ExaSearchType = "auto" | "lite" | "deep-lite" | "deep";
+
+/**
+ * Map a stored searchType onto the Exa 3.0 vocabulary.
+ *
+ * Exa 3.0 (2026-10-19) retired `fast` / `instant` / `deep-reasoning`; its own
+ * migration guidance maps them to `lite` / `deep`. Settings saved before
+ * v0.3.9 may still hold a legacy value — migrate instead of dropping, so a
+ * "fast" user does not silently fall back to `auto`. Unknown values return
+ * undefined and are dropped by the sanitizer.
+ */
+export function normalizeExaSearchType(value: unknown): ExaSearchType | undefined {
+  if (typeof value !== "string") return undefined;
+  if (value === "fast" || value === "instant") return "lite";
+  if (value === "deep-reasoning") return "deep";
+  if (value === "auto" || value === "lite" || value === "deep-lite" || value === "deep") return value;
+  return undefined;
+}
+
 export interface ExaProviderOptions {
-  searchType?: "auto" | "fast" | "instant" | "deep-lite" | "deep" | "deep-reasoning";
+  /**
+   * Exa /search `type`. Exa 3.0 (2026-10-19) recommends `auto`, `lite` and
+   * `deep`. `lite` serves cached content only and rejects freshness
+   * parameters. Legacy `fast` / `instant` / `deep-reasoning` are migrated to
+   * `lite` / `deep` by normalizeExaSearchType.
+   */
+  searchType?: ExaSearchType;
   maxAgeHours?: number;
 }
 

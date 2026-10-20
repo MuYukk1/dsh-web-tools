@@ -68,7 +68,7 @@ export function sanitizeProviderOptions(
     case "exa": {
       // normalizeExaSearchType both whitelists the Exa 3.0 lineup and
       // migrates legacy stored values (fast/instant → lite, deep-reasoning →
-      // deep), so settings saved before v0.3.9 keep their intent.
+      // deep), so settings saved before v0.4.0 keep their intent.
       const searchType = normalizeExaSearchType(raw.searchType);
       if (searchType) out.searchType = searchType;
       if (typeof raw.maxAgeHours === "number" && (raw.maxAgeHours >= -1 && raw.maxAgeHours <= 8760)) {

@@ -11,7 +11,7 @@ export type ExaSearchType = "auto" | "lite" | "deep-lite" | "deep";
  *
  * Exa 3.0 (2026-10-19) retired `fast` / `instant` / `deep-reasoning`; its own
  * migration guidance maps them to `lite` / `deep`. Settings saved before
- * v0.3.9 may still hold a legacy value — migrate instead of dropping, so a
+ * v0.4.0 may still hold a legacy value — migrate instead of dropping, so a
  * "fast" user does not silently fall back to `auto`. Unknown values return
  * undefined and are dropped by the sanitizer.
  */

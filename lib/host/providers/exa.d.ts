@@ -8,7 +8,7 @@
  * - `type: "auto"` for balanced neural / keyword retrieval. Exa 3.0's lineup
  *   is `auto` / `lite` / `deep-lite` / `deep`; the legacy `fast` / `instant` /
  *   `deep-reasoning` values were removed from the plugin (settings saved
- *   before v0.3.9 are migrated by normalizeExaSearchType).
+ *   before v0.4.0 are migrated by normalizeExaSearchType).
  * - `type: "lite"` serves cached content only and REJECTS freshness parameters
  *   (a parameter lite does not support returns a 400), so `maxAgeHours` is
  *   omitted for lite instead of forwarded.

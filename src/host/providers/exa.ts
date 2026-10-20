@@ -1,10 +1,21 @@
 /**
  * dsh-web-tools — Exa provider adapter (neural/semantic search).
  *
- * Canonical reference: https://docs.exa.ai/reference/search-api-guide-for-coding-agents
+ * Canonical reference: https://docs.exa.ai/reference/search
  * - POST https://api.exa.ai/search with `x-api-key` header (canonical raw REST)
- * - Content mode: `contents.highlights = true` (token-efficient extractive highlights)
- * - `type: "auto"` for balanced neural / keyword retrieval
+ * - Content mode: `contents.highlights = true` (token-efficient extractive highlights;
+ *   Exa 3.0 upgrades this to cross-result Dynamic Highlights at no charge)
+ * - `type: "auto"` for balanced neural / keyword retrieval. Exa 3.0's lineup
+ *   is `auto` / `lite` / `deep-lite` / `deep`; the legacy `fast` / `instant` /
+ *   `deep-reasoning` values were removed from the plugin (settings saved
+ *   before v0.3.9 are migrated by normalizeExaSearchType).
+ * - `type: "lite"` serves cached content only and REJECTS freshness parameters
+ *   (a parameter lite does not support returns a 400), so `maxAgeHours` is
+ *   omitted for lite instead of forwarded.
+ * - Response `notices` explain how results were produced — Exa's docs say to
+ *   pass them to the model with the results — so they are surfaced through
+ *   SearchOutcome.content. `warnings` are for the integrator, not the model,
+ *   and are intentionally not forwarded.
  * - /contents uses `urls` + `text: true` for full-page markdown fetch
  *
  * @module
@@ -34,13 +45,16 @@ export function buildExaSearchBody(
   hints?: Readonly<SearchHints>,
 ): Record<string, unknown> {
   const cleanQ = hints?.cleanQuery ? hints.cleanQuery : query;
+  const type = options?.searchType ?? "auto";
   const body: Record<string, unknown> = {
     query: cleanQ,
-    type: options?.searchType ?? "auto",
+    type,
     numResults,
     contents: {
       highlights: true,
-      ...(typeof options?.maxAgeHours === "number" ? { maxAgeHours: options.maxAgeHours } : {}),
+      // Exa Lite serves cached content only and rejects freshness parameters
+      // with a 400 that names them — omit rather than forward on lite.
+      ...(typeof options?.maxAgeHours === "number" && type !== "lite" ? { maxAgeHours: options.maxAgeHours } : {}),
     },
   };
 
@@ -138,6 +152,44 @@ async function throwExaError(res: Response): Promise<never> {
   throw providerError(code, `Exa: ${message ?? `HTTP ${status}`}${retryHint}`, status);
 }
 
+/**
+ * Flatten an Exa 3.0 `notices` array into one model-facing string.
+ *
+ * Exa's docs: notices "tell the model reading the results how they were
+ * produced" (e.g. when no page matched a `site:` operator and the search ran
+ * without it). The item shape is read defensively (`message` / `description`
+ * / `text` / raw JSON) so a future field rename degrades to a verbose but
+ * harmless note instead of a crash.
+ */
+export function formatExaNotices(notices: unknown): string | undefined {
+  if (!Array.isArray(notices) || notices.length === 0) return undefined;
+  const lines: string[] = [];
+  for (const n of notices) {
+    if (typeof n === "string") {
+      if (n.trim()) lines.push(n.trim());
+    } else if (n && typeof n === "object") {
+      const o = n as Record<string, unknown>;
+      let line = "";
+      for (const key of ["message", "description", "text", "notice"]) {
+        if (typeof o[key] === "string" && (o[key] as string).trim()) {
+          line = (o[key] as string).trim();
+          break;
+        }
+      }
+      if (!line) {
+        try {
+          line = JSON.stringify(o);
+        } catch {
+          line = "";
+        }
+      }
+      if (line) lines.push(line);
+    }
+  }
+  const unique = [...new Set(lines)];
+  return unique.length > 0 ? `Exa: ${unique.join(" | ")}` : undefined;
+}
+
 export const EXA_META = {
   name: "exa",
   label: "Exa",
@@ -185,7 +237,10 @@ export const ExaProvider: ProviderAdapter = {
         return s;
       })
       .filter((x: { url: string } | null): x is { url: string } => x !== null);
-    return { sources };
+    // Exa 3.0 notices ride the SearchOutcome.content channel; `warnings`
+    // (integrator-facing, e.g. IGNORED_FIELD) are deliberately not forwarded.
+    const notices = formatExaNotices(raw?.notices);
+    return notices ? { sources, content: notices } : { sources };
   },
 
   async fetch(url, apiKey, _baseUrl, contextOrSignal) {

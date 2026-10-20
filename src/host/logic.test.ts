@@ -427,10 +427,10 @@ test("buildBraveLlmContextBody maps freshness preset to pd/pw/pm/py and country/
 
 test("buildExaSearchBody maps research topic to publication category and startPublishedDate", () => {
   const hints = extractSearchHints("site:arxiv.org AI reasoning benchmark paper this week", new Date("2026-08-23T12:00:00Z"));
-  const body = buildExaSearchBody("site:arxiv.org AI reasoning benchmark paper this week", 10, { searchType: "fast" }, hints);
+  const body = buildExaSearchBody("site:arxiv.org AI reasoning benchmark paper this week", 10, { searchType: "deep-lite" }, hints);
   
   assert.equal(body.category, "publication");
-  assert.equal(body.type, "fast");
+  assert.equal(body.type, "deep-lite");
   assert.deepEqual(body.includeDomains, ["arxiv.org"]);
   assert.equal(body.startPublishedDate, "2026-08-16T00:00:00.000Z");
 });

@@ -91,6 +91,13 @@ export interface SourceSearchOutcome {
   items: SourceItem[];
   error?: SourceFailure;
   retrievalMode?: "native-browser" | "degraded-web" | "general-web";
+  /**
+   * Model-facing note from the underlying provider (e.g. Exa 3.0 `notices`,
+   * which its docs say to pass to the model with the results). Survives the
+   * general-web round trip so the routed search provider can attach it to
+   * the tool result.
+   */
+  content?: string;
 }
 
 export interface SourceFetchOutcome {

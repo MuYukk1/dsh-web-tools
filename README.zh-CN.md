@@ -188,7 +188,7 @@ dsh plugin --profile web remove dsh-web-tools
 
 | Provider | 搜索 (Search) | 抓取/提取 (Fetch / Extract) | 核心特性与深度适配能力 | 配额查询 (Quota) |
 | --- | --- | --- | --- | --- |
-| [Exa](https://exa.ai) | 支持 | 支持，`/contents` | 语义检索 (`auto` / `fast` / `deep`)、垂直分类映射、Query-aware 高亮切片、ISO 日期范围与域名限制 | 控制台自查 |
+| [Exa](https://exa.ai) | 支持 | 支持，`/contents` | 适配 Exa 3.0：语义检索 (`auto` / `lite` / `deep`，legacy 的 `fast` / `instant` / `deep-reasoning` 仍可用)、垂直分类映射、Query-aware 高亮切片（Dynamic Highlights 正式版）、响应 `notices` 透传给模型、ISO 日期范围与域名限制 | 控制台自查 |
 | [Tavily](https://tavily.com) | 支持 | 支持，`/extract` | 搜索深度 (`basic` / `advanced` / `fast` / `ultra-fast`)，前三种模式支持分块控制，并映射 `news` / `finance`、日期、国家与域名参数 | 官方 API |
 | [Firecrawl](https://firecrawl.dev) | 支持 | 支持，`/scrape` | 技术查询映射 `github` 分类、学术查询映射 `research`，支持 `tbs`、域名限制与 Clean Markdown 提取 | 官方 API |
 | [Parallel](https://parallel.ai) | 支持 | 支持，`/v1/extract` | 双层语义检索 (`advanced` / `basic` / `turbo`)、`objective` 软引导、`source_policy` 域名/时效过滤 | 控制台自查 |

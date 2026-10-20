@@ -18,6 +18,8 @@ import {
   exaPrimaryMode,
   exaPrimaryApplyable,
 } from "../src/client/provider-preferences/contracts.ts";
+import { normalizeExaSearchType } from "../src/shared/provider-options.ts";
+import { sanitizeProviderOptions } from "../src/host/provider-options.ts";
 
 // ------ Brave content threshold ------
 test("Brave: uses disabled not off for the off/threshold value", () => {
@@ -64,28 +66,55 @@ test("Tavily: chunks visible only when depth is advanced AND autoParams is false
 });
 
 // ------ Exa search type contracts ------
-test("Exa: search type options match the official API", () => {
-  assert.deepStrictEqual([...EXA_SEARCH_TYPE_OPTIONS], ["auto", "fast", "instant", "deep-lite", "deep", "deep-reasoning"]);
+test("Exa: search type options are the Exa 3.0 lineup", () => {
+  // Exa 3.0 (2026-10-19) retired fast / instant / deep-reasoning; the plugin
+  // no longer offers them. Stored legacy values are migrated, not offered.
+  assert.deepStrictEqual([...EXA_SEARCH_TYPE_OPTIONS], ["auto", "lite", "deep-lite", "deep"]);
 });
 
-test("Exa: primary mode mapping collapses instant into fast and deep variants into deep", () => {
+test("Exa: legacy stored types normalize onto the 3.0 vocabulary", () => {
+  assert.strictEqual(normalizeExaSearchType("fast"), "lite");
+  assert.strictEqual(normalizeExaSearchType("instant"), "lite");
+  assert.strictEqual(normalizeExaSearchType("deep-reasoning"), "deep");
+  assert.strictEqual(normalizeExaSearchType("auto"), "auto");
+  assert.strictEqual(normalizeExaSearchType("lite"), "lite");
+  assert.strictEqual(normalizeExaSearchType("deep-lite"), "deep-lite");
+  assert.strictEqual(normalizeExaSearchType("deep"), "deep");
+  assert.strictEqual(normalizeExaSearchType("nonsense"), undefined);
+  assert.strictEqual(normalizeExaSearchType(42), undefined);
+});
+
+test("Exa: host sanitizer migrates legacy values instead of dropping them", () => {
+  // A user who picked "fast" before v0.3.9 keeps the low-latency intent.
+  assert.deepStrictEqual(sanitizeProviderOptions("exa", { searchType: "fast" }), { searchType: "lite" });
+  assert.deepStrictEqual(sanitizeProviderOptions("exa", { searchType: "instant" }), { searchType: "lite" });
+  assert.deepStrictEqual(sanitizeProviderOptions("exa", { searchType: "deep-reasoning" }), { searchType: "deep" });
+  // Current values pass through untouched.
+  assert.deepStrictEqual(sanitizeProviderOptions("exa", { searchType: "deep-lite" }), { searchType: "deep-lite" });
+  // Unknown values are dropped.
+  assert.deepStrictEqual(sanitizeProviderOptions("exa", { searchType: "agent" }), {});
+});
+
+test("Exa: primary mode mapping buckets lite as fast and deep variants as deep", () => {
   assert.strictEqual(exaPrimaryMode("auto"), "auto");
-  assert.strictEqual(exaPrimaryMode("fast"), "fast");
-  assert.strictEqual(exaPrimaryMode("instant"), "fast");
+  assert.strictEqual(exaPrimaryMode("lite"), "fast");
   assert.strictEqual(exaPrimaryMode("deep-lite"), "deep");
   assert.strictEqual(exaPrimaryMode("deep"), "deep");
+  // Legacy values still bucket correctly (migration path).
+  assert.strictEqual(exaPrimaryMode("fast"), "fast");
+  assert.strictEqual(exaPrimaryMode("instant"), "fast");
   assert.strictEqual(exaPrimaryMode("deep-reasoning"), "deep");
 });
 
 test("Exa: lossless guard prevents deep from overwriting precise deep variants", () => {
   // Safe: "deep" clicked while current is auto → allowed
   assert.strictEqual(exaPrimaryApplyable("deep", "auto"), true);
-  // Safe: "fast" clicked while current is deep-reasoning → allowed (user explicitly switches)
-  assert.strictEqual(exaPrimaryApplyable("fast", "deep-reasoning"), true);
-  // Blocked: "deep" clicked while current is deep-reasoning → lossless, blocked
-  assert.strictEqual(exaPrimaryApplyable("deep", "deep-reasoning"), false);
-  // Blocked: "deep" clicked while current is deep-lite → blocked
+  // Safe: "fast" clicked while current is deep-lite → allowed (user explicitly switches)
+  assert.strictEqual(exaPrimaryApplyable("fast", "deep-lite"), true);
+  // Blocked: "deep" clicked while current is deep-lite → lossless, blocked
   assert.strictEqual(exaPrimaryApplyable("deep", "deep-lite"), false);
-  // Safe: "deep" clicked while current is deep → blocked (no-op, but harmless)
+  // Blocked: "deep" clicked while current is deep → blocked (no-op, but harmless)
   assert.strictEqual(exaPrimaryApplyable("deep", "deep"), false);
+  // Blocked: legacy deep-reasoning migrates to deep, so plain deep must not overwrite it
+  assert.strictEqual(exaPrimaryApplyable("deep", "deep-reasoning"), false);
 });

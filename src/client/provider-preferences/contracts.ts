@@ -7,6 +7,8 @@
  * @module
  */
 
+import { normalizeExaSearchType } from "../../shared/provider-options.ts";
+
 /** Brave context_threshold_mode values accepted by the API. */
 export const BRAVE_THRESHOLD_OPTIONS = ["strict", "balanced", "lenient", "disabled"] as const;
 
@@ -36,23 +38,26 @@ export function tavilyChunksVisible(depth: string, autoParams: boolean): boolean
   return depth === "advanced" && !autoParams;
 }
 
-/** Exa search type options. */
-export const EXA_SEARCH_TYPE_OPTIONS = ["auto", "fast", "instant", "deep-lite", "deep", "deep-reasoning"] as const;
+/** Exa search type options — the Exa 3.0 lineup (legacy fast / instant / deep-reasoning removed). */
+export const EXA_SEARCH_TYPE_OPTIONS = ["auto", "lite", "deep-lite", "deep"] as const;
 
 /** Map an Exa mode to its SIMPLE (primary) UI bucket. */
 export function exaPrimaryMode(mode: string): "auto" | "fast" | "deep" {
-  if (mode === "auto") return "auto";
-  if (mode === "fast" || mode === "instant") return "fast";
+  const m = normalizeExaSearchType(mode) ?? "auto";
+  if (m === "auto") return "auto";
+  // lite is Exa 3.0's recommended low-latency type.
+  if (m === "lite") return "fast";
   return "deep";
 }
 
 /**
  * Lossless primary-mode guard: clicking "深入" must never overwrite an
- * existing precise deep variant (deep-lite / deep / deep-reasoning) with
- * plain "deep". The precise value is only changeable in the native picker.
+ * existing precise deep variant (deep-lite / deep) with plain "deep". The
+ * precise value is only changeable in the native picker.
  */
 export function exaPrimaryApplyable(v: string, currentMode: string): boolean {
-  if (v === "deep" && currentMode.startsWith("deep")) return false;
+  const m = normalizeExaSearchType(currentMode) ?? "auto";
+  if (v === "deep" && m.startsWith("deep")) return false;
   return true;
 }
 

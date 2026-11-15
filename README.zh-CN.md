@@ -8,7 +8,7 @@
 
 让 DeepSeek Harness 拥有直连全网与社媒平台的搜索与抓取能力。
 
-**8 大 Web Provider 原生能力适配 · SearchHints 语义编译 · 多源自动容灾 · 小红书 / Twitter X 平台检索**
+**9 大 Web Provider 原生能力适配 · SearchHints 语义编译 · 多源自动容灾 · 小红书 / Twitter X 平台检索**
 
 <p align="center">
   <a href="https://github.com/A3Boy/dsh-web-tools/stargazers">
@@ -31,7 +31,7 @@
 
 当联网能力只依赖一个 Web Provider 时，额度耗尽、限流或服务异常都可能直接中断检索；而简单接入多个搜索 API，往往又只能使用它们共同支持的基础能力，没有真正发挥不同搜索源各自擅长的搜索模式、分类、时效、域名策略和正文提取能力。
 
-dsh-web-tools 将 Exa、Tavily、Firecrawl、Parallel、Brave、You.com、Jina、SearXNG，以及小红书、Twitter / X 接入 DSH 标准 `web_search` / `web_fetch`。
+dsh-web-tools 将 Exa、Tavily、Firecrawl、Parallel、Brave、You.com、Jina、Keenable、SearXNG，以及小红书、Twitter / X 接入 DSH 标准 `web_search` / `web_fetch`。
 
 在统一 DSH 工具接口的同时，dsh-web-tools 通过 SearchHints 归一化查询意图，再针对不同 Provider 分别编译为其支持的原生参数，尽可能使用各家的分类、时效、域名、地区、深度搜索与正文提取能力；同时通过多 API Key、Provider Fallback 和平台专用浏览器会话，提高整个联网链路的可用性。
 
@@ -39,7 +39,7 @@ dsh-web-tools 将 Exa、Tavily、Firecrawl、Parallel、Brave、You.com、Jina�
 
 **核心亮点**：
 
-- **8 大 Web Provider 原生能力深度适配**：保持统一 `web_search` / `web_fetch` 接口，但不把不同搜索源压成最低公共能力。针对 Exa、Tavily、Firecrawl、Parallel、Brave、You.com、Jina、SearXNG 分别适配搜索类型、时效、域名策略、地区语言、深度检索与正文提取能力。
+- **9 大 Web Provider 原生能力深度适配**：保持统一 `web_search` / `web_fetch` 接口，但不把不同搜索源压成最低公共能力。针对 Exa、Tavily、Firecrawl、Parallel、Brave、You.com、Jina、Keenable、SearXNG 分别适配搜索类型、时效、域名策略、地区语言、深度检索与正文提取能力。
 - **SearchHints → Provider-specific 参数编译**：将 Query 中的技术 / 论文 / 新闻、时效、域名、地区与语言等搜索意图归一化，再按不同 Provider 的能力映射为各自原生参数；整个过程由确定性代码完成，不增加额外 LLM 调用。
 - **小红书与 Twitter / X 平台来源**：两个平台均通过独立的本地浏览器 Profile 提供已登录站内搜索、详情抓取，以及页面实际返回的评论或回复。
 - **多搜索源调度与自动容灾**：支持多 API Key 分配、鉴权失败切换、429 冷却、Ordered / Round-Robin / Random 路由，以及可配置 Provider Fallback。
@@ -84,7 +84,7 @@ DSH 的 `web_search` 只接受 `queries: string[]`，因此搜索约束直接写
 
 国家参数的优先级（从高到低）：模型显式写出的 `country:` 指令 → query 文本中提到的国家 → Provider 自身默认（完全不下发该参数）→ 该 Provider 拒绝请求时切换到下一个搜索源。无法识别的代码会被忽略而不是下发，查询照常执行，工具返回结果里会说明该指令被丢弃。
 
-## 8 大 Web Provider 原生能力深度适配
+## 9 大 Web Provider 原生能力深度适配
 
 统一的是 DSH 的工具接口和搜索语义，不统一的是各家 Provider 的能力。
 
@@ -108,6 +108,7 @@ dsh-web-tools 通过 SearchHints 表达查询意图，再针对不同 Provider �
 * **You.com**：原生 **`boost_domains`** 软加权支持，时效与地区国家过滤。
 * **Jina**：搜索关键词降噪与 ReaderLM-v2 高精度 Markdown 正文解析。
 * **SearXNG**：自建元搜索支持 `categories` (it/science/news) 与 `time_range`。
+* **Keenable**：Web 搜索，支持 `site` 域名限定与 `published_after` / `published_before` 日期过滤。
 * **原生与通用正文提取 (`web_fetch`)**：配置 Tavily、Exa、Firecrawl、Parallel、You.com、Jina 时自动优先调用其原生云端提取接口；未配置或失败时，以及使用 SearXNG / Brave 时，自动平滑回退至**插件内置通用 HTTP 抓取器**（基于 Defuddle 纯本地 Markdown 解析与 SSRF / DNS 安全防护），无需额外配置或购买第三方 Fetch Key。
 
 ---
@@ -144,10 +145,10 @@ Agent 使用 `小红书:` 或 `X:` 作为平台路由前缀。前缀只负责选
 
 ## 自定义搜索源与地址覆盖 (Issue #9)
 
-除了内置的 8 大搜索源与社交媒体平台外，插件完整支持**自定义搜索源 (Custom Search Providers)** 与**内置源地址自定义**：
+除了内置的 9 大搜索源与社交媒体平台外，插件完整支持**自定义搜索源 (Custom Search Providers)** 与**内置源地址自定义**：
 
 * **内置源地址覆盖与恢复**：
-  * 全部 8 大内置搜索源（Exa、Tavily、Firecrawl、Brave、You、Parallel、Jina、SearXNG）均支持自定义服务地址（例如自建 API 网关、代理镜像）。
+  * 全部 9 大内置搜索源（Exa、Tavily、Firecrawl、Brave、You、Parallel、Jina、Keenable、SearXNG）均支持自定义服务地址（例如自建 API 网关、代理镜像）。
   * 精确保留路径前缀（如 `/v1`、`/v2`），并在跨域名变更时进行凭证保护提示，支持随时一键恢复官方默认地址。
 * **三条并列接入路径（单弹窗渐进式配置）**：
   * **兼容已有搜索接口**：遵循标准 Tavily JSON POST 规范，免配任何字段映射，适合快速接入各开源代理镜像或兼容网关。
@@ -218,7 +219,7 @@ Agent 使用 `小红书:` 或 `X:` 作为平台路由前缀。前缀只负责选
 
 ## 安装与更新
 
-**DSH 版本支持**：`0.1.0-rc.6` 起，包含 `0.2.0-rc.x` 与 `0.2.1-rc.x`（`latest` / `next` 两条线均已验证）。版本要求写在 `peerDependencies` 中，DSH 会据此判断插件能否激活；升级 DSH 后若插件未激活，先执行一次 `dsh plugin --profile web update dsh-web-tools`。
+**DSH 版本支持**：`0.1.0-rc.6` 起，包含 `0.2.0-rc.x`、`0.2.1-rc.x` 与 `0.2.2-rc.x`（`latest` / `next` 两条线均已验证）。版本要求写在 `engines.dsh` 中，DSH 0.2.1 起**优先按该字段判定**，不再看 `@deepseek-ai/dsh*` 的 peer 范围；升级 DSH 后若插件未激活，先执行一次 `dsh plugin --profile web update dsh-web-tools`。
 
 ```bash
 # 安装插件
@@ -238,14 +239,21 @@ dsh plugin --profile web remove dsh-web-tools
 
 | DSH 宿主版本 | 状态 |
 | --- | --- |
-| `0.2.1-rc.2` | 支持（当前发布版本） |
+| `0.2.2-rc.3` | 支持（当前发布版本） |
+| `0.2.1-rc.2` | 支持 |
 | `0.2.0-rc.1` – `0.2.0` | 支持 |
 | `0.1.0-rc.6` – `0.1.7` | 支持 |
 
-兼容范围写在 `engines.dsh` 中。DSH 0.2.1 起**优先按该字段判定**，不再看 `@deepseek-ai/dsh*` 的 peer 范围，因此这里两者保持同步。0.2.1 系列有两处变更与插件直接相关：
+兼容范围写在 `engines.dsh` 中。DSH 0.2.1 起**优先按该字段判定**，不再看 `@deepseek-ai/dsh*` 的 peer 范围，因此这里两者保持同步。注意 DSH 校验该范围时**启用预发布匹配**，`0.2.2-rc.3` 才得以通过；peer 范围里则显式追加了 `^0.2.2-0`，因为标准 SemVer 不会让预发布版本匹配，除非范围里出现了同一 `主.次.修订` 元组。
+
+0.2.1 系列有两处变更与插件直接相关：
 
 - **`webRuntime` 服务已被移除。** DSH 0.2.1 用 `webStartup` 取代它（监听地址与信任配置随之迁移）。本插件已不再注入该服务——插件若仍声明一个永远不会挂载的服务，会一直停在 pending 状态，导致所有供应商、设置接口与页面静默失效。
 - **DSH 自带了网页搜索设置页。** `插件` → `网页搜索设置`（区块 id `web-search`）用于配置 DeepSeek 官方的 Search / Fetch API，写入的正是本插件固定为 `dsh-web-tools` 的同一份 `web` 配置。在该页切换为 DeepSeek 供应商（或导出 `DSH_WEB_SEARCH_PROVIDER`）会绕过本插件，需要重新固定为 `dsh-web-tools` 才能恢复。本插件自己的页面仍在 `Settings` → `Web Search`（id `web-tools`）。
+
+0.2.2 系列把宿主的 Node.js 最低版本提高到 **24.9**，并把 loader 同步到 Cordis 4.1；两者对插件都不构成破坏。本插件使用的扩展点——`agent/pre-step`（waterfall，`{ kind: "enter", messages }`）、`agent/turn-stopping`（serial）、`agent.steer` / `agent.cancel`、`tools.restrict` / `tools.guard`——在 `0.2.2-rc.3` 中均未变化。0.2.2 确实存在的破坏性变更（`tools.resolve` / `executable` 迁移、提示词组装接口、Session Projection 注册改异步、`agent/request` 不再允许改路由）与本插件无关：这些接口一个都没用到。
+
+> 一处既有隐患，**不是** 0.2.2 引入的回归：`tools.restrict()` 在工具名不是已知全局工具时会抛错。若宿主因缺少联网凭据而不下发 `web_search` / `web_fetch`，把 Search Mode 切到 **Off** 时第一层拦截可能无法生效；此时 `tools.guard()` 那一层仍会拒绝调用。
 
 ---
 
@@ -261,6 +269,7 @@ dsh plugin --profile web remove dsh-web-tools
 | [You.com](https://you.com) | 支持 | 支持，`/v1/contents` | 搜索高亮片段提取、原生 **`boost_domains`** 软加权、时效与国家过滤、Markdown 正文接口 | 官方 API |
 | [Jina](https://jina.ai) | 支持 | 支持，Reader | 搜索关键词降噪、ReaderLM-v2 高精度 Markdown 转换、Token 预算控制 | 尽力解析 |
 | [SearXNG](https://docs.searxng.org) | 支持 | — | 开源自托管元搜索引擎，映射 `categories` (it/science/news) 与受支持的 `time_range`，适配器无需 API Key | 由自建实例决定 |
+| [Keenable](https://keenable.ai) | 支持 | — | Web 搜索 API（`X-API-Key`），将首个限定域名映射为 `site`，时效日期映射为 `published_after` / `published_before`，返回 `published_at`；`web_fetch` 使用内置通用抓取器 | 仅控制台 |
 
 ### 快速选型指南
 
@@ -275,6 +284,7 @@ dsh plugin --profile web remove dsh-web-tools
 | **正文转 Markdown** | **Firecrawl** / **Jina** | 支持正文提取、主内容过滤或 Reader 转换 |
 | **时效、地区与域名偏好** | **You.com** | 支持 freshness、地区语言和 `boost_domains` 参数 |
 | **自托管元搜索** | **SearXNG** | 使用用户自己的 SearXNG 地址，适配器不要求 API Key |
+| **Agent 检索 / 精炼摘要提取** | **Keenable** | 支持原生 `site` 域名限定与 `published_after` / `published_before` 发布日期过滤，高质量网页摘要抽取 |
 
 ---
 

@@ -8,7 +8,7 @@
 
 Empower DeepSeek Harness with unified search and deep content extraction across the open web and social platforms.
 
-**Native-Capability Adaptation Across 8 Web Providers · SearchHints Semantic Compilation · Multi-Source Resilience · Xiaohongshu & Twitter / X Retrieval**
+**Native-Capability Adaptation Across 9 Web Providers · SearchHints Semantic Compilation · Multi-Source Resilience · Xiaohongshu & Twitter / X Retrieval**
 
 <p align="center">
   <a href="https://github.com/A3Boy/dsh-web-tools/stargazers">
@@ -31,7 +31,7 @@ Empower DeepSeek Harness with unified search and deep content extraction across 
 
 When web access depends on a single provider, exhausted quota, rate limits, or timeouts can interrupt retrieval. Wrapping multiple APIs with a naive proxy often flattens them to a lowest common denominator, failing to leverage each provider's specialized search modes, categories, freshness, domain rules, and extraction capabilities.
 
-dsh-web-tools connects Exa, Tavily, Firecrawl, Parallel, Brave, You.com, Jina, SearXNG, Xiaohongshu, and Twitter / X to DSH’s standard `web_search` / `web_fetch` interface.
+dsh-web-tools connects Exa, Tavily, Firecrawl, Parallel, Brave, You.com, Jina, Keenable, SearXNG, Xiaohongshu, and Twitter / X to DSH’s standard `web_search` / `web_fetch` interface.
 
 While keeping the tool interface unified, dsh-web-tools normalizes search intents through SearchHints and compiles queries into native provider-specific parameters. This leverages each engine's native categories, freshness filters, domain policies, regional targeting, and content extraction, while maximizing uptime through multi-key allocation, automated failover, and dedicated browser profiles.
 
@@ -39,7 +39,7 @@ While keeping the tool interface unified, dsh-web-tools normalizes search intent
 
 **Key Highlights**:
 
-- **Native-Capability Adaptation Across 8 Web Providers**: Keeps the standard `web_search` / `web_fetch` contracts while compiling unified search intent into provider-specific native parameters instead of reducing every backend to the same lowest-common-denominator feature set.
+- **Native-Capability Adaptation Across 9 Web Providers**: Keeps the standard `web_search` / `web_fetch` contracts while compiling unified search intent into provider-specific native parameters instead of reducing every backend to the same lowest-common-denominator feature set.
 - **SearchHints → Provider-Specific Parameter Compilation**: Normalizes technical, research, news, date, region, and domain constraints from queries, compiling them into provider-native parameters through deterministic code without additional LLM latency.
 - **Xiaohongshu & Twitter / X Platform Sources**: Both platforms support signed-in native search, detail extraction, and returned comments or replies through dedicated local browser profiles.
 - **Multi-Source Scheduling & Resilience**: Features multi-API-key pooling, 401 failover, 429 cooldown windows, configurable Ordered / Round-Robin / Random routing, and failover chains.
@@ -84,7 +84,7 @@ DSH's `web_search` takes only `queries: string[]`, so search constraints are wri
 
 Country precedence, highest first: an explicit `country:` directive → a country mentioned in the query text → the provider's own default (no parameter at all) → the next provider in the fallback chain if this one rejects the request. An unrecognised code is ignored rather than forwarded, the query still runs, and the tool result reports that the directive was dropped.
 
-## Native-Capability Adaptation Across 8 Web Providers
+## Native-Capability Adaptation Across 9 Web Providers
 
 The tool interface and search semantics are unified for the DSH agent, but underlying provider capabilities are not.
 
@@ -108,6 +108,7 @@ All adaptations run through deterministic code without invoking an extra LLM cal
 * **You.com**: Native **`boost_domains`** soft-weighting, freshness presets, and geo/language targeting.
 * **Jina**: Query noise reduction and ReaderLM-v2 high-precision markdown extraction.
 * **SearXNG**: Self-hosted metasearch with `categories` (it/science/news) and `time_range`.
+* **Keenable**: Web search with `site` domain scoping and `published_after` / `published_before` date filters.
 * **Native & Generic Page Extraction (`web_fetch`)**: Automatically routes to provider-native scraping backends (Exa `/contents`, Tavily `/extract`, Firecrawl `/scrape`, Parallel `/v1/extract`, You.com `/v1/contents`, Jina Reader) when available; seamlessly falls back to the **built-in generic HTTP fetcher** (powered by local Defuddle Markdown parsing with SSRF/DNS protection) for SearXNG-only / Brave-only setups or when native extractors fail.
 
 ---
@@ -144,10 +145,10 @@ Agents use `小红书:` or `X:` as a platform-routing prefix. The prefix selects
 
 ## Custom Search Providers & Address Overrides (Issue #9)
 
-In addition to the 8 built-in search adapters and social platforms, dsh-web-tools natively supports **Custom Search Providers** and **Built-in Service Address Overrides**:
+In addition to the 9 built-in search adapters and social platforms, dsh-web-tools natively supports **Custom Search Providers** and **Built-in Service Address Overrides**:
 
 * **Built-in Base URL Overrides**:
-  * All 8 built-in search providers (Exa, Tavily, Firecrawl, Brave, You, Parallel, Jina, SearXNG) support custom service addresses (e.g. self-hosted API gateways, reverse proxies).
+  * All 9 built-in search providers (Exa, Tavily, Firecrawl, Brave, You, Parallel, Jina, Keenable, SearXNG) support custom service addresses (e.g. self-hosted API gateways, reverse proxies).
   * Preserves path prefixes (such as `/v1`, `/v2`), prompts for confirmation on foreign destinations to protect API keys, and supports instant restoration to official defaults.
 * **Three Parallel Access Paths (Progressive Modal UX)**:
   * **Compatible Provider API**: Follows the standard Tavily POST JSON specification with zero manual mapping. Ideal for self-hosted proxies and compatible gateways.
@@ -218,7 +219,7 @@ In addition to the 8 built-in search adapters and social platforms, dsh-web-tool
 
 ## Installation & Updates
 
-**DSH version support**: `0.1.0-rc.6` and later, including the `0.2.0-rc.x` and `0.2.1-rc.x` lines (both the `latest` and `next` channels are verified). The requirement lives in `peerDependencies`, which DSH uses to decide whether the plugin may activate; if the plugin stays inactive after a DSH upgrade, run `dsh plugin --profile web update dsh-web-tools` once.
+**DSH version support**: `0.1.0-rc.6` and later, including the `0.2.0-rc.x`, `0.2.1-rc.x` and `0.2.2-rc.x` lines (both the `latest` and `next` channels are verified). The requirement lives in `engines.dsh`, which DSH 0.2.1 and later read **instead of** the `@deepseek-ai/dsh*` peer ranges; if the plugin stays inactive after a DSH upgrade, run `dsh plugin --profile web update dsh-web-tools` once.
 
 ```bash
 # Install
@@ -238,14 +239,21 @@ Restart `dsh web` and navigate to `Settings` → `Web Search`.
 
 | DSH host | Status |
 | --- | --- |
-| `0.2.1-rc.2` | Supported (current release) |
+| `0.2.2-rc.3` | Supported (current release) |
+| `0.2.1-rc.2` | Supported |
 | `0.2.0-rc.1` – `0.2.0` | Supported |
 | `0.1.0-rc.6` – `0.1.7` | Supported |
 
-The range is declared in `engines.dsh`. DSH 0.2.1 reads that field **instead of** the `@deepseek-ai/dsh*` peer ranges, so both are kept in step here. Two host changes in the 0.2.1 line matter:
+The range is declared in `engines.dsh`. DSH 0.2.1 and later read that field **instead of** the `@deepseek-ai/dsh*` peer ranges, so both are kept in step here. Note that DSH validates the range with prereleases enabled, which is why `0.2.2-rc.3` matches; the peer ranges carry an explicit `^0.2.2-0` clause because plain SemVer excludes a prerelease unless its own version tuple appears in the range.
+
+Two host changes in the 0.2.1 line matter:
 
 - **`webRuntime` is gone.** DSH 0.2.1 replaced that service with `webStartup` (listener and trust configuration moved with it). This plugin no longer injects it — a plugin that still lists a service that never mounts stays pending, which silently disables every provider, the settings API and the page.
 - **DSH now ships its own web-search page.** `Plugins` → `网页搜索设置` / `Web Search` (section id `web-search`) configures DeepSeek's own Search and Fetch APIs and writes the same `web` config this plugin pins to `dsh-web-tools`. Choosing a DeepSeek provider there, or exporting `DSH_WEB_SEARCH_PROVIDER`, bypasses this plugin until `dsh-web-tools` is pinned again. This plugin's page stays at `Settings` → `Web Search` (id `web-tools`).
+
+The 0.2.2 line raises the host's minimum Node.js to **24.9** and moves the loader to Cordis 4.1; neither is a plugin-facing break here. The extension points this plugin uses — `agent/pre-step` (waterfall, `{ kind: "enter", messages }`), `agent/turn-stopping` (serial), `agent.steer` / `agent.cancel`, `tools.restrict` / `tools.guard` — are unchanged in `0.2.2-rc.3`. The 0.2.2 breaking changes that do exist (`tools.resolve` / `executable` migration, the prompt-assembly interface, the now-async Session Projection registration, and `agent/request` no longer being allowed to re-route a model) do not apply: this plugin uses none of them.
+
+> One pre-existing caveat, not a 0.2.2 regression: `tools.restrict()` throws when a named tool is not a known global tool. If the host withholds `web_search` / `web_fetch` (for example because no web credential is ready), switching Search Mode to **Off** can therefore fail to apply its first enforcement layer. The monotonic `tools.guard()` layer still denies the call.
 
 ---
 
@@ -261,6 +269,7 @@ The range is declared in `engines.dsh`. DSH 0.2.1 reads that field **instead of*
 | [You.com](https://you.com) | Yes | Yes, `/v1/contents` | Snippet highlights, native **`boost_domains`** soft-weighting, freshness and country/lang filters, markdown endpoint | Official API |
 | [Jina](https://jina.ai) | Yes | Yes, Reader | Search query noise filtering, ReaderLM-v2 high-precision markdown, token budget and truncation control | Best-effort |
 | [SearXNG](https://docs.searxng.org) | Yes | — | Open-source self-hosted metasearch with `categories` and supported `time_range` values; the adapter requires no API key | Instance-defined |
+| [Keenable](https://keenable.ai) | Yes | — | Web search API (`X-API-Key`); maps the first included domain to `site` and freshness dates to `published_after` / `published_before`; returns `published_at`. `web_fetch` uses the built-in generic fetcher | Dashboard only |
 
 ### Quick Recommendation Guide
 
@@ -275,6 +284,7 @@ New installations default to **Exa**; existing installations keep their saved pr
 | **Content-to-Markdown Extraction** | **Firecrawl** / **Jina** | Main-content filtering, scraping, and Reader conversion |
 | **Freshness, Region, and Domain Preference** | **You.com** | Freshness, locale, and `boost_domains` parameters |
 | **Self-Hosted Metasearch** | **SearXNG** | Uses your SearXNG endpoint; the adapter requires no API key |
+| **Agent Search & Clean Summaries** | **Keenable** | Native `site` domain filtering, `published_after` / `published_before` date filtering, and concise snippets |
 
 ---
 

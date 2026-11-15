@@ -208,6 +208,20 @@ export class SearchModeRuntime {
     return this.turns.get(sessionId);
   }
 
+  /**
+   * Drop the per-turn bookkeeping when an agent leaves the registry.
+   *
+   * The MODE deliberately survives. It is a session-level preference, and the
+   * host rebuilds the agent on every compaction (`agent/created` with source
+   * `compact`): wiping the mode on disposal made 始终联网 / 关闭联网 silently
+   * fall back to 智能联网 after each compaction. The announcement marker also
+   * survives here — {@link resetAnnouncement} is what clears it, driven by the
+   * rebuild source rather than by disposal.
+   */
+  clearTurnState(sessionId: string): void {
+    this.turns.delete(sessionId);
+  }
+
   /** Drop every state for a disposed agent/session. */
   clear(sessionId: string): void {
     this.modes.delete(sessionId);
@@ -528,7 +542,10 @@ export function installSearchModeRuntime(
           liftRestriction();
           liftRestriction = undefined;
         }
-        runtime.clear(agent.id);
+        // Compaction disposes this agent and registers a new one for the same
+        // session, so the mode must outlive the scope that carries these
+        // listeners.
+        runtime.clearTurnState(agent.id);
       };
     }, "dsh-web-tools: search-mode agent listeners");
   });

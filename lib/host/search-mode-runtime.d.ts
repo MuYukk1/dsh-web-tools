@@ -108,6 +108,17 @@ export declare class SearchModeRuntime {
      */
     markFetchResult(sessionId: string, succeeded: boolean): void;
     getTurn(sessionId: string): TurnState | undefined;
+    /**
+     * Drop the per-turn bookkeeping when an agent leaves the registry.
+     *
+     * The MODE deliberately survives. It is a session-level preference, and the
+     * host rebuilds the agent on every compaction (`agent/created` with source
+     * `compact`): wiping the mode on disposal made 始终联网 / 关闭联网 silently
+     * fall back to 智能联网 after each compaction. The announcement marker also
+     * survives here — {@link resetAnnouncement} is what clears it, driven by the
+     * rebuild source rather than by disposal.
+     */
+    clearTurnState(sessionId: string): void;
     /** Drop every state for a disposed agent/session. */
     clear(sessionId: string): void;
     view(sessionId: string): SearchModeView;

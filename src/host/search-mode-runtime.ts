@@ -11,8 +11,11 @@
  * listeners): every agent-scoped listener is registered on that agent's scope
  * context inside `agent/created`, so `@deepseek-ai/dsh-scope` dispatches only
  * the matching agent's events to it.
- *   - `agent/pre-step` (waterfall): freeze the per-turn flag and inject one
- *     plugin-source UserMessage (official `createUserMessage`) on step 1.
+ *   - `agent/pre-step` (waterfall): freeze the per-turn flag and, on step 1,
+ *     inject one plugin-source UserMessage (official `createUserMessage`).
+ *     A `required` turn restates the obligation every turn; `auto` and `off`
+ *     announce once per session and again only after a mode change or a
+ *     rebuilt transcript (`agent/created` with source `clear` / `compact`).
  *   - `tools/result` (emit): receipt that a web_search or web_fetch ran.
  *     Completion — even a total provider failure — counts as "tried"; that is
  *     the requirement.
@@ -103,6 +106,7 @@ export const REQUIRED_SEARCH_CORRECTION_TEXT =
 export class SearchModeRuntime {
   private readonly modes = new Map<string, SearchMode>();
   private readonly turns = new Map<string, TurnState>();
+  private readonly announced = new Map<string, SearchMode>();
   private readonly searchAvailable: () => boolean;
 
   constructor(searchAvailable: () => boolean = () => true) {
@@ -116,6 +120,29 @@ export class SearchModeRuntime {
   setMode(sessionId: string, mode: SearchMode): void {
     if (mode === "auto") this.modes.delete(sessionId);
     else this.modes.set(sessionId, mode);
+  }
+
+  /**
+   * The mode whose one-shot notice was already injected into this session, or
+   * undefined when nothing has been announced yet. Drives
+   * {@link shouldAnnounceMode} so a standing state is not restated every turn.
+   */
+  announcedMode(sessionId: string): SearchMode | undefined {
+    return this.announced.get(sessionId);
+  }
+
+  /** Record that this session's transcript now carries the mode's notice. */
+  markAnnounced(sessionId: string, mode: SearchMode): void {
+    this.announced.set(sessionId, mode);
+  }
+
+  /**
+   * Forget what was announced so the next turn restates the policy. Called when
+   * the transcript is rebuilt (`clear` / `compact`): the earlier notice may no
+   * longer be in the model's context.
+   */
+  resetAnnouncement(sessionId: string): void {
+    this.announced.delete(sessionId);
   }
 
   /** True when this session has web search switched OFF. */
@@ -185,6 +212,7 @@ export class SearchModeRuntime {
   clear(sessionId: string): void {
     this.modes.delete(sessionId);
     this.turns.delete(sessionId);
+    this.announced.delete(sessionId);
   }
 
   view(sessionId: string): SearchModeView {
@@ -316,6 +344,56 @@ export function searchModeStepMessage(
   return messages.auto();
 }
 
+/**
+ * Whether this turn must restate the mode.
+ *
+ * `required` is a per-turn obligation — "this turn must research" is true of
+ * the CURRENT turn only, so the previous turn's copy is stale and must be
+ * superseded. `auto` and `off` are standing states: the criterion or the
+ * "switched off" notice describes how the session behaves, not what this turn
+ * must do, so stating it once is enough until the mode changes or the
+ * transcript is rebuilt.
+ *
+ * Restating a standing state every turn is what issue #17 reported: the
+ * injected message is a real UserMessage that stays in the transcript, so a
+ * 30-turn session used to carry 30 copies and re-sent every one of them on
+ * every request.
+ * @param mode - the mode frozen for this turn.
+ * @param announced - the mode already announced in this session, if any.
+ */
+export function shouldAnnounceMode(mode: SearchMode, announced: SearchMode | undefined): boolean {
+  if (mode === "required") return true;
+  return announced !== mode;
+}
+
+/** The message to inject plus the mode it announces. */
+export interface SearchModeAnnouncement {
+  message: unknown;
+  mode: SearchMode;
+}
+
+/**
+ * Decide the pre-step injection for one step under the announcement policy.
+ * Combines {@link searchModeStepMessage} (which text) with
+ * {@link shouldAnnounceMode} (whether to say it again) so the host can record
+ * exactly what it injected.
+ * @returns undefined when this step injects nothing.
+ */
+export function searchModeAnnouncement(
+  state: TurnState | undefined,
+  step: number,
+  messages: SearchModeMessages,
+  announced: SearchMode | undefined,
+): SearchModeAnnouncement | undefined {
+  if (!state) return undefined;
+  if (step !== 1) return undefined;
+  const mode: SearchMode = state.disabled ? "off" : state.required ? "required" : "auto";
+  if (!shouldAnnounceMode(mode, announced)) return undefined;
+  const message = searchModeStepMessage(state, step, messages);
+  if (message === undefined) return undefined;
+  return { message, mode };
+}
+
 /** An agent-scoped context that can subscribe to its own pre-step result. */
 interface AgentScopedCtx {
   on(event: string, listener: (...args: any[]) => unknown, options?: unknown): () => void;
@@ -326,6 +404,13 @@ interface AgentScopedCtx {
     guard?(guard: (execution: { name: string }) => string | undefined): () => void;
   };
 }
+
+/**
+ * Why a session lifecycle began; mirrors DSH's `SessionStartSource`
+ * (`agent/created` payload). `clear` and `compact` rebuild the transcript, so
+ * a notice injected earlier is no longer guaranteed to be in context.
+ */
+export type SessionStartSource = "startup" | "resume" | "clear" | "compact";
 
 /** The two model-facing web tools this plugin owns the policy for. */
 export const WEB_TOOL_NAMES: readonly string[] = ["web_search", "web_fetch"];
@@ -352,8 +437,13 @@ export function installSearchModeRuntime(
   runtime: SearchModeRuntime,
   messages: SearchModeMessages,
 ) {
-  const onCreated = ctx.on("agent/created", (payload: { agent: ScopedAgent }) => {
+  const onCreated = ctx.on("agent/created", (payload: { agent: ScopedAgent; source?: SessionStartSource }) => {
     const agent = payload.agent;
+    // A rebuilt transcript (clear / compact) no longer carries the notice that
+    // was injected before, so the next turn restates the policy once.
+    if (payload.source === "clear" || payload.source === "compact") {
+      runtime.resetAnnouncement(agent.id);
+    }
     // Register this agent's listeners inside its own scope so scope-filtered
     // dispatch reaches them; cleaning up when the agent scope unwinds.
     return agent.ctx.effect(() => {
@@ -386,14 +476,20 @@ export function installSearchModeRuntime(
           if (payload.signal?.aborted) return decision;
           const state = runtime.beginTurn(agent.id, payload.turn);
           syncRestriction();
-          const inject = searchModeStepMessage(state, payload.step, messages);
-          if (!inject) return decision;
+          const announcement = searchModeAnnouncement(
+            state,
+            payload.step,
+            messages,
+            runtime.announcedMode(agent.id),
+          );
+          if (!announcement) return decision;
+          runtime.markAnnounced(agent.id, announcement.mode);
           const entered = decision as { kind: "enter"; messages: unknown[] };
           // Prepend so the Search Mode policy sits before the user's direct
           // message (the model's last user-role input remains the user query).
           return {
             kind: "enter",
-            messages: [inject, ...(entered.messages ?? [])],
+            messages: [announcement.message, ...(entered.messages ?? [])],
           };
         },
       );

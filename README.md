@@ -185,7 +185,9 @@ In addition to the 9 built-in search adapters and social platforms, dsh-web-tool
 * **Session-Level Search Mode**: A refined, compact picker in the composer offering three deterministic retrieval behaviors (defaults to Smart):
   * **Smart (智能联网)**: Elastic semantic dispatch. The agent autonomously determines whether real-time web retrieval is needed based on conversational intent.
   * **Always (始终联网)**: Strong-consistency knowledge verification. Mandates at least one completed `web_search` or `web_fetch` per turn to ensure claims are grounded in external sources.
-  * **Off (关闭联网)**: Deterministic physical isolation. Replaces fragile prompt-only requests with a **three-tier runtime enforcement barrier** (dynamically withholds tools from the agent's schema, blocks model inertia via a monotonic guard before execution, and injects a single-turn explanation), ensuring zero outbound network leakage regardless of historical context.
+  * **Off (关闭联网)**: Deterministic physical isolation. Replaces fragile prompt-only requests with a **three-tier runtime enforcement barrier** (dynamically withholds tools from the agent's schema, blocks model inertia via a monotonic guard before execution, and explains the restriction to the model), ensuring zero outbound network leakage regardless of historical context.
+
+  The mode is **session state, not agent state**: the host rebuilds the agent whenever it compacts a session, and the selection survives that rebuild instead of silently reverting to Smart. Each mode's instruction is injected as a real user message, so it is announced **once per session** for Smart and Off — again only after a mode change, a session clear, or a compaction. Always restates its obligation every turn, because "this turn must research" is only true of the current turn.
 
 <div align="center">
   <table>

@@ -15,6 +15,7 @@ import {
   createSearchModeMessages,
   searchModeStepMessage,
   searchModeAnnouncement,
+  installSearchModeRuntime,
   shouldAnnounceMode,
   webResearchCompleted,
   requiredSearchText,
@@ -132,13 +133,26 @@ test("setMode(auto) clears the entry back to auto", () => {
   assert.equal(r.beginTurn("s1", 1).required, false);
 });
 
-test("clear drops mode and turn state (agent disposed)", () => {
+test("clear drops mode and turn state (explicit full reset)", () => {
   const r = runtime();
   r.setMode("s1", "required");
   r.beginTurn("s1", 1);
   r.clear("s1");
   assert.equal(r.getMode("s1"), "auto");
   assert.equal(r.getTurn("s1"), undefined);
+});
+
+test("clearTurnState drops the turn but keeps the session mode", () => {
+  const r = runtime();
+  r.setMode("s1", "off");
+  r.beginTurn("s1", 4);
+  r.markAnnounced("s1", "off");
+
+  r.clearTurnState("s1");
+
+  assert.equal(r.getTurn("s1"), undefined, "turn bookkeeping is per agent instance");
+  assert.equal(r.getMode("s1"), "off", "the mode is a session preference, not agent state");
+  assert.equal(r.announcedMode("s1"), "off", "the notice is still in the transcript");
 });
 
 test("view reports mode and availability", () => {
@@ -515,4 +529,87 @@ test("searchModeAnnouncement stays silent outside step 1 and without turn state"
   const r = runtime();
   assert.equal(searchModeAnnouncement(undefined, 1, messages, undefined), undefined);
   assert.equal(searchModeAnnouncement(r.beginTurn("s", 1), 2, messages, undefined), undefined);
+});
+
+// ---- agent lifecycle: the mode is session state, not agent state -----------
+// Compaction disposes the agent and registers a new one for the SAME session.
+// Wiping the mode on disposal made 始终联网 / 关闭联网 silently revert to 智能联网
+// after every compaction.
+
+/** Minimal host + agent stand-ins for installSearchModeRuntime. */
+function lifecycleHarness() {
+  const hostListeners = new Map<string, any>();
+  const ctx: any = {
+    on: (event: string, listener: any) => {
+      hostListeners.set(event, listener);
+      return () => {};
+    },
+  };
+  const runtime = new SearchModeRuntime(() => true);
+  const messages = createSearchModeMessages(() => "M");
+  installSearchModeRuntime(ctx, { searchAvailable: () => true }, runtime, messages);
+
+  const enter = async (agentListeners: Map<string, any>, turn: number) =>
+    agentListeners.get("agent/pre-step")({ turn, step: 1 }, async () => ({ kind: "enter", messages: [] }));
+
+  /** Register an agent the way the host does, returning its disposal hook. */
+  const register = (id: string, source: "startup" | "resume" | "clear" | "compact") => {
+    const agentListeners = new Map<string, any>();
+    let dispose: (() => void) | undefined;
+    const agent = {
+      id,
+      ctx: {
+        on: (event: string, listener: any) => {
+          agentListeners.set(event, listener);
+          return () => {};
+        },
+        effect: (fn: () => any) => {
+          dispose = fn() ?? (() => {});
+        },
+        tools: {},
+      },
+      steer: () => {},
+      cancel: () => {},
+    };
+    hostListeners.get("agent/created")({ agent, source });
+    return { agentListeners, dispose: () => dispose?.() };
+  };
+
+  return { runtime, register, enter };
+}
+
+test("agent disposal keeps the session mode (compaction must not reset it)", () => {
+  const { runtime, register } = lifecycleHarness();
+  const first = register("sess-1", "startup");
+  runtime.setMode("sess-1", "required");
+
+  first.dispose();
+
+  assert.equal(runtime.getMode("sess-1"), "required", "disposal is not a mode reset");
+  assert.equal(runtime.getTurn("sess-1"), undefined, "turn bookkeeping is dropped");
+});
+
+test("a rebuilt transcript re-announces; a resumed one does not", async () => {
+  const { runtime, register, enter } = lifecycleHarness();
+
+  // Fresh session, auto mode: the criterion is announced once.
+  const first = register("sess-a", "startup");
+  const turn1 = await enter(first.agentListeners, 1);
+  assert.equal(turn1.messages.length, 1, "first auto turn announces");
+  const turn2 = await enter(first.agentListeners, 2);
+  assert.equal(turn2.messages.length, 0, "second auto turn stays silent");
+
+  // Resume keeps the transcript, so the notice is still there.
+  first.dispose();
+  const resumed = register("sess-a", "resume");
+  const afterResume = await enter(resumed.agentListeners, 3);
+  assert.equal(afterResume.messages.length, 0, "resume must not duplicate the notice");
+
+  // Compaction rebuilds the transcript: the notice may be gone, so restate it.
+  resumed.dispose();
+  const compacted = register("sess-a", "compact");
+  const afterCompact = await enter(compacted.agentListeners, 4);
+  assert.equal(afterCompact.messages.length, 1, "compaction restates the policy once");
+  const nextTurn = await enter(compacted.agentListeners, 5);
+  assert.equal(nextTurn.messages.length, 0, "and only once");
 });

@@ -14,6 +14,8 @@ import {
   SearchModeRuntime,
   createSearchModeMessages,
   searchModeStepMessage,
+  searchModeAnnouncement,
+  shouldAnnounceMode,
   webResearchCompleted,
   requiredSearchText,
   SEARCH_AUTO_TEXT,
@@ -414,3 +416,103 @@ test("slash /search and the UI button write the same runtime", () => {
 });
 
 
+
+// ---- announcement policy: standing states are not restated every turn ------
+// Regression cover for issue #17 ("智能联网判据被反复注入"): the injected notice
+// is a real UserMessage that stays in the transcript, so repeating it per turn
+// multiplied both the visible noise and the prompt tokens.
+
+test("shouldAnnounceMode: required restates every turn, standing states announce once", () => {
+  // `required` is a per-turn obligation: the previous turn's copy is stale.
+  assert.equal(shouldAnnounceMode("required", undefined), true);
+  assert.equal(shouldAnnounceMode("required", "required"), true);
+  assert.equal(shouldAnnounceMode("required", "auto"), true);
+
+  // `auto` / `off` describe the session, not this turn.
+  assert.equal(shouldAnnounceMode("auto", undefined), true, "first turn announces");
+  assert.equal(shouldAnnounceMode("auto", "auto"), false, "a second auto turn stays silent");
+  assert.equal(shouldAnnounceMode("auto", "off"), true, "a mode change announces");
+  assert.equal(shouldAnnounceMode("auto", "required"), true);
+
+  assert.equal(shouldAnnounceMode("off", undefined), true);
+  assert.equal(shouldAnnounceMode("off", "off"), false);
+  assert.equal(shouldAnnounceMode("off", "auto"), true);
+});
+
+test("announcedMode tracks what the transcript already carries", () => {
+  const r = runtime();
+  assert.equal(r.announcedMode("s1"), undefined);
+  r.markAnnounced("s1", "auto");
+  assert.equal(r.announcedMode("s1"), "auto");
+  r.resetAnnouncement("s1");
+  assert.equal(r.announcedMode("s1"), undefined, "a rebuilt transcript forgets the notice");
+  r.markAnnounced("s1", "off");
+  r.clear("s1");
+  assert.equal(r.announcedMode("s1"), undefined, "a disposed agent drops it too");
+  // Sessions never share announcement state.
+  r.markAnnounced("a", "auto");
+  assert.equal(r.announcedMode("b"), undefined);
+});
+
+test("auto mode injects once per session, not once per turn (issue #17)", () => {
+  const { calls, createUserMessage } = captureFactory();
+  const messages = createSearchModeMessages(createUserMessage);
+  const r = runtime();
+
+  // Five consecutive auto turns, each starting at step 1.
+  const injected: unknown[] = [];
+  let announced = r.announcedMode("s-auto");
+  for (let turn = 1; turn <= 5; turn += 1) {
+    const state = r.beginTurn("s-auto", turn);
+    const a = searchModeAnnouncement(state, 1, messages, announced);
+    if (a) {
+      injected.push(a.message);
+      announced = a.mode;
+      r.markAnnounced("s-auto", a.mode);
+    }
+  }
+
+  assert.equal(injected.length, 1, "only the first auto turn injects the criterion");
+  assert.equal(calls.length, 1, "exactly one UserMessage is built for the session");
+  assert.equal((calls[0].content as Array<{ text: string }>)[0].text, SEARCH_AUTO_TEXT);
+});
+
+test("a mode change re-announces; returning to a mode does too", () => {
+  const messages = createSearchModeMessages(() => "M");
+  const r = runtime();
+
+  const auto1 = searchModeAnnouncement(r.beginTurn("s", 1), 1, messages, r.announcedMode("s"));
+  assert.equal(auto1?.mode, "auto");
+  r.markAnnounced("s", auto1!.mode);
+
+  const auto2 = searchModeAnnouncement(r.beginTurn("s", 2), 1, messages, r.announcedMode("s"));
+  assert.equal(auto2, undefined, "same mode, nothing to say");
+
+  r.setMode("s", "off");
+  const off = searchModeAnnouncement(r.beginTurn("s", 3), 1, messages, r.announcedMode("s"));
+  assert.equal(off?.mode, "off", "switching to off announces the notice");
+  r.markAnnounced("s", off!.mode);
+
+  r.setMode("s", "auto");
+  const back = searchModeAnnouncement(r.beginTurn("s", 4), 1, messages, r.announcedMode("s"));
+  assert.equal(back?.mode, "auto", "switching back restates the criterion");
+});
+
+test("required mode still restates the obligation on every turn", () => {
+  const messages = createSearchModeMessages(() => "M");
+  const r = runtime();
+  r.setMode("s-req", "required");
+
+  for (const turn of [1, 2, 3]) {
+    const a = searchModeAnnouncement(r.beginTurn("s-req", turn), 1, messages, r.announcedMode("s-req"));
+    assert.equal(a?.mode, "required", `turn ${turn} must carry the requirement`);
+    r.markAnnounced("s-req", a!.mode);
+  }
+});
+
+test("searchModeAnnouncement stays silent outside step 1 and without turn state", () => {
+  const messages = createSearchModeMessages(() => "M");
+  const r = runtime();
+  assert.equal(searchModeAnnouncement(undefined, 1, messages, undefined), undefined);
+  assert.equal(searchModeAnnouncement(r.beginTurn("s", 1), 2, messages, undefined), undefined);
+});

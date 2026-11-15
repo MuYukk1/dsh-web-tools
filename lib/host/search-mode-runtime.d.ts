@@ -11,8 +11,11 @@
  * listeners): every agent-scoped listener is registered on that agent's scope
  * context inside `agent/created`, so `@deepseek-ai/dsh-scope` dispatches only
  * the matching agent's events to it.
- *   - `agent/pre-step` (waterfall): freeze the per-turn flag and inject one
- *     plugin-source UserMessage (official `createUserMessage`) on step 1.
+ *   - `agent/pre-step` (waterfall): freeze the per-turn flag and, on step 1,
+ *     inject one plugin-source UserMessage (official `createUserMessage`).
+ *     A `required` turn restates the obligation every turn; `auto` and `off`
+ *     announce once per session and again only after a mode change or a
+ *     rebuilt transcript (`agent/created` with source `clear` / `compact`).
  *   - `tools/result` (emit): receipt that a web_search or web_fetch ran.
  *     Completion — even a total provider failure — counts as "tried"; that is
  *     the requirement.
@@ -64,10 +67,25 @@ export declare const REQUIRED_SEARCH_CORRECTION_TEXT = "Web Search is required f
 export declare class SearchModeRuntime {
     private readonly modes;
     private readonly turns;
+    private readonly announced;
     private readonly searchAvailable;
     constructor(searchAvailable?: () => boolean);
     getMode(sessionId: string): SearchMode;
     setMode(sessionId: string, mode: SearchMode): void;
+    /**
+     * The mode whose one-shot notice was already injected into this session, or
+     * undefined when nothing has been announced yet. Drives
+     * {@link shouldAnnounceMode} so a standing state is not restated every turn.
+     */
+    announcedMode(sessionId: string): SearchMode | undefined;
+    /** Record that this session's transcript now carries the mode's notice. */
+    markAnnounced(sessionId: string, mode: SearchMode): void;
+    /**
+     * Forget what was announced so the next turn restates the policy. Called when
+     * the transcript is rebuilt (`clear` / `compact`): the earlier notice may no
+     * longer be in the model's context.
+     */
+    resetAnnouncement(sessionId: string): void;
     /** True when this session has web search switched OFF. */
     isOff(sessionId: string): boolean;
     /** Whether a usable search provider currently exists (drives `available`). */
@@ -151,6 +169,43 @@ export declare function createSearchModeMessages(createUserMessage: (input: unkn
  * @returns undefined (no injection) outside step 1 or without a turn state.
  */
 export declare function searchModeStepMessage(state: TurnState | undefined, step: number, messages: SearchModeMessages): unknown | undefined;
+/**
+ * Whether this turn must restate the mode.
+ *
+ * `required` is a per-turn obligation — "this turn must research" is true of
+ * the CURRENT turn only, so the previous turn's copy is stale and must be
+ * superseded. `auto` and `off` are standing states: the criterion or the
+ * "switched off" notice describes how the session behaves, not what this turn
+ * must do, so stating it once is enough until the mode changes or the
+ * transcript is rebuilt.
+ *
+ * Restating a standing state every turn is what issue #17 reported: the
+ * injected message is a real UserMessage that stays in the transcript, so a
+ * 30-turn session used to carry 30 copies and re-sent every one of them on
+ * every request.
+ * @param mode - the mode frozen for this turn.
+ * @param announced - the mode already announced in this session, if any.
+ */
+export declare function shouldAnnounceMode(mode: SearchMode, announced: SearchMode | undefined): boolean;
+/** The message to inject plus the mode it announces. */
+export interface SearchModeAnnouncement {
+    message: unknown;
+    mode: SearchMode;
+}
+/**
+ * Decide the pre-step injection for one step under the announcement policy.
+ * Combines {@link searchModeStepMessage} (which text) with
+ * {@link shouldAnnounceMode} (whether to say it again) so the host can record
+ * exactly what it injected.
+ * @returns undefined when this step injects nothing.
+ */
+export declare function searchModeAnnouncement(state: TurnState | undefined, step: number, messages: SearchModeMessages, announced: SearchMode | undefined): SearchModeAnnouncement | undefined;
+/**
+ * Why a session lifecycle began; mirrors DSH's `SessionStartSource`
+ * (`agent/created` payload). `clear` and `compact` rebuild the transcript, so
+ * a notice injected earlier is no longer guaranteed to be in context.
+ */
+export type SessionStartSource = "startup" | "resume" | "clear" | "compact";
 /** The two model-facing web tools this plugin owns the policy for. */
 export declare const WEB_TOOL_NAMES: readonly string[];
 /** Denial reason shown to the model when it calls a web tool while OFF. */
